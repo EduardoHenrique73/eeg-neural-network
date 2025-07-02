@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EEG Visualizer Pro</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --color-primary: #1E3A8A;
+            --color-secondary: #2563EB;
+            --color-accent: #EF4444;
+            --color-surface: #FFFFFF;
+            --color-background: #F8FAFC;
+            --color-text: #1F2937;
+            --border-radius: 12px;
+            --shadow: 0 4px 16px rgba(0,0,0,0.1);
+            --transition: all 0.3s ease;
+        }
+
+        /* Reset e Estilos Base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            transition: var(--transition);
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--color-background);
+            color: var(--color-text);
+            line-height: 1.6;
+            padding: 2rem 1rem;
+        }
+
+        /* Componentes Reutilizáveis */
+        .card {
+            background: var(--color-surface);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--border-radius);
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .button--primary {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .button--primary:hover {
+            background: var(--color-secondary);
+        }
+
+        /* Layout do Header */
+        .header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3rem;
+        }
+
+        .header__title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 1.75rem;
+        }
+
+        .filter-form {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .select {
+            padding: 0.75rem;
+            border: 2px solid var(--color-primary);
+            border-radius: var(--border-radius);
+            background: var(--color-surface);
+            min-width: 200px;
+        }
+
+        /* Seção de Gráficos */
+        .graph-section {
+            margin-bottom: 3rem;
+        }
+
+        .graph-navigation {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        /* Análise Simbólica */
+        .symbolic-analysis {
+            display: grid;
+            gap: 2rem;
+        }
+
+        .analysis-grid {
+            display: grid;
+            gap: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .data-panel {
+            background: var(--color-surface);
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+        }
+
+        .binary-group {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            margin: 0.25rem;
+            background: var(--color-background);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        /* Legenda e Metadados */
+        .legend {
+            display: flex;
+            gap: 2rem;
+            padding: 1rem;
+            background: var(--color-background);
+            border-radius: var(--border-radius);
+            margin-top: 1.5rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .color-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+        }
+
+        .color-swatch--0 { background: #d3d3d3; }
+        .color-swatch--1 { background: #1f77b4; }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .filter-form {
+                width: 100%;
+                flex-direction: column;
+            }
+            
+            .select {
+                width: 100%;
+            }
+            
+            .graph-section {
+                padding: 1rem;
+            }
+            
+            .analysis-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header card">
+        <h1 class="header__title">
+            <i class="fas fa-brain"></i>
+            EEG Visualizer Pro
+        </h1>
+        
+        <form class="filter-form" action="{{ url_for('filtrar') }}" method="POST">
+            <select class="select" name="categoria">
+                <option value="">Todos os Sinais</option>
+                <option value="sim" {% if categoria == 'sim' %}selected{% endif %}>Grupo Sim</option>
+                <option value="nao" {% if categoria == 'nao' %}selected{% endif %}>Grupo Não</option>
+            </select>
+            <button type="submit" class="button button--primary">
+                <i class="fas fa-filter"></i>
+                Filtrar
+            </button>
+        </form>
+    </header>
+
+    <main class="container">
+        <!-- Seção Principal de Gráficos -->
+        <section class="graph-section card">
+            <h2 class="section-title">Visualização de Sinais EEG</h2>
+            
+            {% if graficos_html %}
+                <div class="plotly-container">
+                    {% for html in graficos_html %}
+                        <div class="plot-wrapper">
+                            {{ html|safe }}
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="graph-navigation">
+                    <button class="button button--primary" onclick="prevGraph()">
+                        <i class="fas fa-chevron-left"></i>
+                        Anterior
+                    </button>
+                    <button class="button button--primary" onclick="nextGraph()">
+                        Próximo
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-chart-line"></i>
+                    <p>Nenhum dado disponível para exibição</p>
+                </div>
+            {% endif %}
+        </section>
+
+        <!-- Análise Simbólica -->
+        {% for hist in histogramas %}
+        <section class="symbolic-analysis card">
+            <h2 class="section-title">Análise Detalhada: {{ hist.nome }}</h2>
+            
+            <div class="analysis-grid">
+                <!-- Histograma -->
+                <div class="data-panel">
+                    <h3>Distribuição de Padrões</h3>
+                    <img src="{{ hist.url_histograma }}" 
+                         alt="Distribuição de padrões binários" 
+                         class="responsive-image">
+                    <div class="legend">
+                        <div class="legend-item">
+                            <span class="color-swatch color-swatch--1"></span>
+                            <span>Acima da Média ({{ hist.limiar }})</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="color-swatch color-swatch--0"></span>
+                            <span>Abaixo da Média</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sequência Temporal -->
+                <div class="data-panel">
+                    <h3>Sequência Temporal Binária</h3>
+                    <img src="{{ hist.url_sequencia }}" 
+                         alt="Variação temporal dos estados binários" 
+                         class="responsive-image">
+                </div>
+            </div>
+
+            <!-- Detalhes Numéricos -->
+            <div class="analysis-grid">
+                <div class="data-panel">
+                    <h3>Primeiros 20 Estados Binários</h3>
+                    <div class="binary-sequence">
+                        {% for bit in hist.sequencia_binaria[:20] %}
+                            <span class="binary-group">{{ bit }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="data-panel">
+                    <h3>Grupos de 3 Bits</h3>
+                    <div class="binary-groups">
+                        {% for grupo in hist.grupos_binarios[:10] %}
+                            <span class="binary-group">{{ grupo }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </section>
+        {% endfor %}
+    </main>
+
+    <script>
+        // Controle de Navegação Avançado
+        let currentGraph = 0;
+        const graphs = document.querySelectorAll('.plot-wrapper');
+        const totalGraphs = graphs.length;
+
+        function updateNavigation() {
+            graphs.forEach((graph, index) => {
+                graph.style.display = index === currentGraph ? 'block' : 'none';
+            });
+            
+            // Atualizar Plotly após mudança de visibilidade
+            window.dispatchEvent(new Event('resize'));
+        }
+
+        function prevGraph() {
+            currentGraph = (currentGraph - 1 + totalGraphs) % totalGraphs;
+            updateNavigation();
+        }
+
+        function nextGraph() {
+            currentGraph = (currentGraph + 1) % totalGraphs;
+            updateNavigation();
+        }
+
+        // Inicialização
+        if (totalGraphs > 0) {
+            updateNavigation();
+        }
+    </script>
+</body>
+</html>
