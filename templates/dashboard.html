@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - EEG Visualizer Pro</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        :root {
+            --primary-blue: #1e40af;
+            --secondary-blue: #3b82f6;
+            --accent-blue: #60a5fa;
+            --light-blue: #dbeafe;
+            --dark-blue: #1e3a8a;
+            --success-green: #10b981;
+            --warning-orange: #f59e0b;
+            --danger-red: #ef4444;
+            --surface-white: #ffffff;
+            --background-light: #f8fafc;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --border-radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* Header Principal */
+        .main-header {
+            background: var(--surface-white);
+            box-shadow: var(--shadow-lg);
+            padding: 1.5rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .logo-text h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .logo-text p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--primary-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--dark-blue);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--light-blue);
+            color: var(--primary-blue);
+        }
+
+        .btn-secondary:hover {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        /* Container Principal */
+        .main-container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--surface-white);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-md);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            background: linear-gradient(135deg, var(--light-blue), #eff6ff);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .card-content {
+            padding: 1.5rem;
+        }
+
+        /* Métricas */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: var(--surface-white);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            border-left: 4px solid var(--primary-blue);
+            transition: var(--transition);
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .metric-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .metric-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.125rem;
+        }
+
+        .metric-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Análise */
+        .analysis-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .analysis-card {
+            background: var(--surface-white);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+        }
+
+        /* Tabela */
+        .table-container {
+            overflow-x: auto;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--surface-white);
+        }
+
+        .data-table th {
+            background: var(--light-blue);
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .data-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+
+        .data-table tr:hover {
+            background: var(--background-light);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-green);
+            border: 1px solid var(--success-green);
+        }
+
+        .badge-warning {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-red);
+            border: 1px solid var(--danger-red);
+        }
+
+        .prediction-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .prediction-sim {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-green);
+            border: 2px solid var(--success-green);
+        }
+
+        .prediction-nao {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-red);
+            border: 2px solid var(--danger-red);
+        }
+
+        /* Status Cards */
+        .status-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .status-card {
+            background: var(--surface-white);
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+            border-top: 4px solid var(--primary-blue);
+        }
+
+        .status-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .status-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .status-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        /* Responsividade */
+        @media (max-width: 1024px) {
+            .analysis-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .main-container {
+                padding: 0 1rem;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .status-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Animações */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        /* Utilitários */
+        .text-muted {
+            color: var(--text-secondary);
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .mb-2 {
+            margin-bottom: 1rem;
+        }
+
+        .mt-2 {
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header Principal -->
+    <header class="main-header">
+        <div class="header-content">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <i class="fas fa-tachometer-alt"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>EEG Visualizer Pro</h1>
+                    <p>Dashboard de Análise Científica</p>
+                </div>
+            </div>
+            
+            <div class="header-controls">
+                <a href="{{ url_for('home') }}" class="btn btn-primary">
+                    <i class="fas fa-chart-line"></i>
+                    Análise de Sinais
+                </a>
+                
+                <form action="{{ url_for('retreinar') }}" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-secondary">
+                        <i class="fas fa-brain"></i>
+                        Retreinar ML
+                    </button>
+                </form>
+            </div>
+        </div>
+    </header>
+
+    <!-- Container Principal -->
+    <main class="main-container">
+        <!-- Status Cards -->
+        <section class="dashboard-grid fade-in-up">
+            <div class="status-cards">
+                <div class="status-card">
+                    <div class="status-icon" style="color: var(--success-green);">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <div class="status-value">{{ stats.total_sinais }}</div>
+                    <div class="status-label">Total de Sinais</div>
+                </div>
+
+                <div class="status-card">
+                    <div class="status-icon" style="color: var(--secondary-blue);">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="status-value">{{ stats.sinais_sim }}</div>
+                    <div class="status-label">Sinais "Sim"</div>
+                </div>
+
+                <div class="status-card">
+                    <div class="status-icon" style="color: var(--danger-red);">
+                        <i class="fas fa-times-circle"></i>
+                    </div>
+                    <div class="status-value">{{ stats.sinais_nao }}</div>
+                    <div class="status-label">Sinais "Não"</div>
+                </div>
+
+                <div class="status-card">
+                    <div class="status-icon" style="color: var(--warning-orange);">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <div class="status-value">{{ "%.3f"|format(stats.entropia_media) }}</div>
+                    <div class="status-label">Entropia Média</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Métricas Detalhadas -->
+        <section class="dashboard-grid fade-in-up">
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+                            <i class="fas fa-percentage"></i>
+                        </div>
+                        <div>
+                            <div class="metric-label">Taxa de Sucesso</div>
+                            <div class="metric-value">
+                                {% if stats.total_sinais > 0 %}
+                                    {{ "%.1f"|format((stats.sinais_sim / stats.total_sinais) * 100) }}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8);">
+                            <i class="fas fa-balance-scale"></i>
+                        </div>
+                        <div>
+                            <div class="metric-label">Balanceamento</div>
+                            <div class="metric-value">
+                                {% if stats.sinais_nao > 0 %}
+                                    {{ "%.2f"|format(stats.sinais_sim / stats.sinais_nao) }}:1
+                                {% else %}
+                                    ∞:1
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div>
+                            <div class="metric-label">Entropia Máxima</div>
+                            <div class="metric-value">
+                                {% if entropias and entropias|length > 0 %}
+                                    {{ "%.4f"|format(entropias|max) }}
+                                {% else %}
+                                    0.0000
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
+                            <i class="fas fa-chart-area"></i>
+                        </div>
+                        <div>
+                            <div class="metric-label">Entropia Mínima</div>
+                            <div class="metric-value">
+                                {% if entropias and entropias|length > 0 %}
+                                    {{ "%.4f"|format(entropias|min) }}
+                                {% else %}
+                                    0.0000
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Gráficos de Análise -->
+        <section class="dashboard-grid fade-in-up">
+            <div class="analysis-section">
+                <div class="analysis-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-chart-pie"></i>
+                            Distribuição por Categoria
+                        </h3>
+                    </div>
+                    <div class="card-content">
+                        <div id="pieChart" style="height: 350px;"></div>
+                    </div>
+                </div>
+
+                <div class="analysis-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-chart-line"></i>
+                            Distribuição de Entropia
+                        </h3>
+                    </div>
+                    <div class="card-content">
+                        <div id="histogramChart" style="height: 350px;"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tabela de Sinais Recentes -->
+        <section class="dashboard-grid fade-in-up">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-table"></i>
+                        Sinais Mais Recentes
+                    </h3>
+                    <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">
+                        Últimos 10 sinais processados com suas análises e predições
+                    </p>
+                </div>
+                <div class="card-content">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nome do Sinal</th>
+                                    <th>Categoria Real</th>
+                                    <th>Entropia</th>
+                                    <th>Predição ML</th>
+                                    <th>Confiança</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sinal in sinais_recentes %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ sinal.nome }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if sinal.categoria == 'Sim' %}badge-success{% else %}badge-warning{% endif %}">
+                                            <i class="fas {% if sinal.categoria == 'Sim' %}fa-check{% else %}fa-times{% endif %}"></i>
+                                            {{ sinal.categoria }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span style="font-family: 'Courier New', monospace; font-weight: 600;">
+                                            {{ "%.4f"|format(sinal.entropia) }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if sinal.predicao %}
+                                        <span class="prediction-badge {% if sinal.predicao.classe_predita == 'Sim' %}prediction-sim{% else %}prediction-nao{% endif %}">
+                                            <i class="fas {% if sinal.predicao.classe_predita == 'Sim' %}fa-check-circle{% else %}fa-times-circle{% endif %}"></i>
+                                            {{ sinal.predicao.classe_predita }}
+                                        </span>
+                                        {% else %}
+                                        <span class="text-muted">
+                                            <i class="fas fa-question-circle"></i>
+                                            Não disponível
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if sinal.predicao %}
+                                        <span style="font-weight: 600; color: var(--primary-blue);">
+                                            {{ "%.1f"|format(sinal.predicao.probabilidade * 100) }}%
+                                        </span>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if sinal.predicao and sinal.predicao.classe_predita == sinal.categoria %}
+                                        <span style="color: var(--success-green);">
+                                            <i class="fas fa-check-circle"></i>
+                                            Correto
+                                        </span>
+                                        {% elif sinal.predicao %}
+                                        <span style="color: var(--danger-red);">
+                                            <i class="fas fa-times-circle"></i>
+                                            Incorreto
+                                        </span>
+                                        {% else %}
+                                        <span class="text-muted">
+                                            <i class="fas fa-minus"></i>
+                                            -
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Gráfico de Pizza - Distribuição por Categoria
+        const pieData = [{
+            values: [{{ stats.sinais_sim }}, {{ stats.sinais_nao }}],
+            labels: ['Sim', 'Não'],
+            type: 'pie',
+            marker: {
+                colors: ['#10b981', '#ef4444'],
+                line: {
+                    color: '#ffffff',
+                    width: 2
+                }
+            },
+            textinfo: 'label+percent',
+            textposition: 'outside',
+            hole: 0.4,
+            hoverinfo: 'label+percent+value'
+        }];
+
+        const pieLayout = {
+            title: {
+                text: 'Distribuição de Sinais por Categoria',
+                font: { size: 18, color: '#1f2937', weight: 'bold' }
+            },
+            showlegend: true,
+            legend: {
+                orientation: 'h',
+                x: 0.5,
+                y: -0.1,
+                font: { size: 12 }
+            },
+            margin: { t: 60, b: 60, l: 60, r: 60 },
+            plot_bgcolor: 'white',
+            paper_bgcolor: 'white'
+        };
+
+        Plotly.newPlot('pieChart', pieData, pieLayout, {
+            responsive: true,
+            displayModeBar: false
+        });
+
+        // Histograma - Distribuição de Entropia
+        const histogramData = [{
+            x: {{ entropias|tojson }},
+            type: 'histogram',
+            nbinsx: 15,
+            marker: {
+                color: '#3b82f6',
+                opacity: 0.8,
+                line: {
+                    color: '#ffffff',
+                    width: 1
+                }
+            },
+            name: 'Entropia',
+            hovertemplate: '<b>Entropia:</b> %{x}<br><b>Frequência:</b> %{y}<extra></extra>'
+        }];
+
+        const histogramLayout = {
+            title: {
+                text: 'Distribuição de Entropia de Shannon',
+                font: { size: 18, color: '#1f2937', weight: 'bold' }
+            },
+            xaxis: {
+                title: {
+                    text: 'Entropia',
+                    font: { size: 14, color: '#6b7280' }
+                },
+                gridcolor: '#e5e7eb',
+                zeroline: false
+            },
+            yaxis: {
+                title: {
+                    text: 'Frequência',
+                    font: { size: 14, color: '#6b7280' }
+                },
+                gridcolor: '#e5e7eb',
+                zeroline: false
+            },
+            plot_bgcolor: 'white',
+            paper_bgcolor: 'white',
+            margin: { t: 60, b: 60, l: 60, r: 60 },
+            showlegend: false
+        };
+
+        Plotly.newPlot('histogramChart', histogramData, histogramLayout, {
+            responsive: true,
+            displayModeBar: false
+        });
+
+        // Animações de entrada
+        document.addEventListener('DOMContentLoaded', function() {
+            const elements = document.querySelectorAll('.fade-in-up');
+            elements.forEach((el, index) => {
+                el.style.animationDelay = `${index * 0.1}s`;
+            });
+
+            // Forçar redimensionamento dos gráficos
+            setTimeout(() => {
+                window.dispatchEvent(new Event('resize'));
+            }, 500);
+        });
+
+        // Atualizar gráficos quando a janela é redimensionada
+        window.addEventListener('resize', function() {
+            if (typeof Plotly !== 'undefined') {
+                Plotly.Plots.resize('pieChart');
+                Plotly.Plots.resize('histogramChart');
+            }
+        });
+    </script>
+</body>
+</html> 

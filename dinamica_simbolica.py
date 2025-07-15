@@ -54,6 +54,30 @@ def calcular_frequencia(palavras_decimais):
     total = sum(contagem.values())
     return {k: v/total for k, v in contagem.items()}
 
+def calcular_entropia_shannon(frequencias):
+    """
+    Calcula a entropia de Shannon normalizada usando logaritmo natural (ln)
+    - Usa logaritmo natural (ln)
+    - Retorna valor normalizado entre 0 e 1
+    - Ignora valores de frequência relativa que sejam 0 ou 1
+    """
+    if not frequencias:
+        return 0.0
+    
+    probabilidades = np.array(list(frequencias.values()))
+    probabilidades_filtradas = probabilidades[(probabilidades > 0) & (probabilidades < 1)]
+    if len(probabilidades_filtradas) == 0:
+        return 0.0
+    probabilidades_norm = probabilidades_filtradas / np.sum(probabilidades_filtradas)
+    entropia_bruta = -np.sum(probabilidades_norm * np.log(probabilidades_norm))
+    n_simbolos = len(probabilidades_filtradas)
+    if n_simbolos > 1:
+        entropia_maxima = np.log(n_simbolos)
+        entropia_normalizada = entropia_bruta / entropia_maxima
+    else:
+        entropia_normalizada = 0.0
+    return max(0.0, min(1.0, entropia_normalizada))
+
 def plotar_histograma(frequencias, nome_base):
     """Gera e salva o histograma com rótulos binários"""
     chaves = sorted(frequencias.keys())
@@ -121,6 +145,9 @@ def aplicar_dinamica_simbolica(id_sinal, m=3):
         grupos_binarios = gerar_grupos_deslizantes(sequencia_binaria, m)
         palavras_decimais = converter_para_decimal(grupos_binarios)
         frequencias = calcular_frequencia(palavras_decimais)
+        
+        # Calcula a entropia de Shannon
+        entropia = calcular_entropia_shannon(frequencias)
 
         nome_base = f"sinal_{id_sinal}"
         caminho_histograma = plotar_histograma(frequencias, nome_base)
@@ -132,7 +159,9 @@ def aplicar_dinamica_simbolica(id_sinal, m=3):
             'sequencia_binaria': sequencia_binaria,
             'grupos_binarios': grupos_binarios,
             'palavras_decimais': palavras_decimais,
-            'limiar': limiar
+            'limiar': limiar,
+            'entropia': entropia,
+            'frequencias': frequencias
         }
 
     finally:

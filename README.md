@@ -17,6 +17,8 @@ Um projeto de pesquisa científica que combina processamento de sinais neurais, 
 - **🔍 Filtros Inteligentes**: Categorização por grupos (Sim/Não)
 - **🗄️ Banco Robusto**: Armazenamento otimizado em PostgreSQL
 - **📱 Design Responsivo**: Interface moderna e mobile-friendly
+- **🤖 Machine Learning**: Classificação automática com redes neurais
+- **📊 Entropia de Shannon**: Medida de complexidade e informação
 
 ## 🛠️ Tecnologias
 
@@ -26,6 +28,7 @@ Um projeto de pesquisa científica que combina processamento de sinais neurais, 
 | **Frontend** | HTML5, CSS3, JavaScript, Plotly.js |
 | **Banco de Dados** | PostgreSQL, psycopg2 |
 | **Análise** | Dinâmica Simbólica, Processamento de Sinais |
+| **Machine Learning** | Scikit-learn, MLPClassifier, RandomForest |
 
 ## 📋 Pré-requisitos
 
@@ -43,7 +46,7 @@ cd eeg-visualizer-pro
 
 2. **Instale as dependências**
 ```bash
-pip install flask plotly psycopg2-binary numpy matplotlib
+pip install flask plotly psycopg2-binary numpy matplotlib scikit-learn pandas seaborn
 ```
 
 3. **Configure o banco PostgreSQL**
@@ -76,6 +79,7 @@ http://localhost:5000
 eeg-visualizer-pro/
 ├── 📄 app.py                    # Servidor Flask principal
 ├── 🧮 dinamica_simbolica.py     # Algoritmos de análise simbólica
+├── 🤖 ml_classifier.py          # Sistema de machine learning
 ├── 🔧 modulo_funcoes.py         # Funções de processamento
 ├── 🗄️ data_base.py             # Configuração do banco
 ├── 📁 Sinais EEG/              # Dados brutos dos sinais
@@ -102,6 +106,149 @@ eeg-visualizer-pro/
 - **Distribuição de Padrões**: Histograma de frequência dos símbolos
 - **Sequência Temporal**: Visualização da evolução binária
 
+## 📊 Entropia de Shannon
+
+### Conceito Teórico
+A **Entropia de Shannon** é uma medida fundamental da teoria da informação que quantifica a incerteza ou complexidade de um sistema. No contexto de sinais EEG, ela mede a diversidade e imprevisibilidade dos padrões temporais.
+
+### Fórmula Matemática
+```
+H(X) = -∑(p(x) × log(p(x)))
+```
+
+Onde:
+- `H(X)` = Entropia de Shannon
+- `p(x)` = Probabilidade do símbolo x
+- `log` = Logaritmo natural (ln)
+
+### Implementação no Projeto
+
+```python
+def calcular_entropia_shannon(frequencias):
+    """
+    Calcula a entropia de Shannon normalizada
+    - Usa logaritmo natural (ln)
+    - Retorna valor normalizado entre 0 e 1
+    - Ignora valores de frequência relativa que sejam 0 ou 1
+    """
+    if not frequencias:
+        return 0.0
+    
+    probabilidades = np.array(list(frequencias.values()))
+    probabilidades_filtradas = probabilidades[(probabilidades > 0) & (probabilidades < 1)]
+    
+    if len(probabilidades_filtradas) == 0:
+        return 0.0
+        
+    probabilidades_norm = probabilidades_filtradas / np.sum(probabilidades_filtradas)
+    entropia_bruta = -np.sum(probabilidades_norm * np.log(probabilidades_norm))
+    
+    n_simbolos = len(probabilidades_filtradas)
+    if n_simbolos > 1:
+        entropia_maxima = np.log(n_simbolos)
+        entropia_normalizada = entropia_bruta / entropia_maxima
+    else:
+        entropia_normalizada = 0.0
+        
+    return max(0.0, min(1.0, entropia_normalizada))
+```
+
+### Interpretação dos Valores
+- **Entropia ≈ 0**: Sinal muito previsível, baixa complexidade
+- **Entropia ≈ 1**: Sinal muito imprevisível, alta complexidade
+- **Entropia ≈ 0.5**: Sinal com complexidade moderada
+
+### Aplicação em EEG
+- **Diagnóstico**: Sinais com entropia muito baixa podem indicar patologias
+- **Classificação**: Diferentes estados cerebrais apresentam entropias distintas
+- **Monitoramento**: Mudanças na entropia podem indicar alterações neurológicas
+
+## 🤖 Rede Neural para Classificação
+
+### Arquitetura da Rede
+O sistema utiliza uma **Multi-Layer Perceptron (MLP)** implementada via scikit-learn:
+
+```python
+from sklearn.neural_network import MLPClassifier
+
+# Configuração da rede neural
+mlp = MLPClassifier(
+    hidden_layer_sizes=(100, 50),  # Duas camadas ocultas
+    activation='relu',             # Função de ativação ReLU
+    solver='adam',                 # Otimizador Adam
+    max_iter=1000,                 # Máximo de iterações
+    random_state=42                # Semente para reprodutibilidade
+)
+```
+
+### Features Utilizadas
+O classificador extrai 15 features principais de cada sinal EEG:
+
+#### Features de Entropia e Dinâmica Simbólica:
+- **entropia_shannon**: Entropia normalizada dos padrões
+- **total_padroes**: Número total de padrões únicos
+- **padroes_unicos**: Quantidade de símbolos distintos
+- **entropia_frequencias**: Entropia da distribuição de frequências
+
+#### Features Estatísticas dos Valores Brutos:
+- **media_valores**: Média aritmética do sinal
+- **desvio_padrao**: Desvio padrão dos valores
+- **variancia**: Variância dos dados
+- **skewness**: Assimetria da distribuição
+- **kurtosis**: Curtose (achatamento) da distribuição
+- **amplitude**: Diferença entre máximo e mínimo
+- **rms**: Root Mean Square (valor eficaz)
+
+#### Features da Sequência Binária:
+- **proporcao_uns**: Proporção de valores '1' na sequência
+- **transicoes**: Número de transições 0→1 e 1→0
+- **comprimento_sequencia**: Tamanho da sequência binária
+
+### Processo de Treinamento
+
+```python
+# 1. Extração de features
+features = classifier.extrair_features_sinal(id_sinal)
+
+# 2. Criação do dataset
+X, y = classifier.criar_dataset(limite=100)
+
+# 3. Normalização dos dados
+X_scaled = classifier.scaler.fit_transform(X)
+
+# 4. Divisão treino/teste
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.2, random_state=42
+)
+
+# 5. Treinamento da rede
+classifier.treinar_modelo(X_train, y_train)
+```
+
+### Métricas de Avaliação
+- **Acurácia**: Proporção de classificações corretas
+- **Precisão**: Proporção de verdadeiros positivos
+- **Recall**: Sensibilidade do modelo
+- **F1-Score**: Média harmônica entre precisão e recall
+- **Matriz de Confusão**: Visualização dos erros de classificação
+
+### Exemplo de Uso
+
+```python
+from ml_classifier import EEGClassifier
+
+# Inicializa o classificador
+classifier = EEGClassifier()
+
+# Carrega modelo treinado
+classifier.carregar_modelo('modelo_eeg.pkl')
+
+# Faz predição em um novo sinal
+resultado = classifier.prever_sinal(id_sinal=321)
+print(f"Classe predita: {resultado['classe']}")
+print(f"Probabilidade: {resultado['probabilidade']:.2f}")
+```
+
 ## 📊 Exemplo de Uso
 
 ```python
@@ -111,6 +258,7 @@ from dinamica_simbolica import aplicar_dinamica_simbolica
 resultado = aplicar_dinamica_simbolica(id_sinal=321, m=3)
 
 print(f"Limiar: {resultado['limiar']:.2f}")
+print(f"Entropia de Shannon: {resultado['entropia']:.4f}")
 print(f"Padrões encontrados: {len(resultado['grupos_binarios'])}")
 ```
 
