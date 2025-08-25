@@ -1,9 +1,5 @@
-#!/usr/bin/env python3
-"""
-Sistema de Machine Learning para Classificação de Sinais EEG
-Usa entropia de Shannon e outras features para distinguir entre grupos
-Versão simplificada usando scikit-learn (sem TensorFlow)
-"""
+
+
 
 import numpy as np
 import pandas as pd
@@ -304,7 +300,6 @@ class EEGClassifier:
         print("\nRelatório de Classificação:")
         print(classification_report(y, y_pred, target_names=['Não', 'Sim']))
         
-        # Matriz de confusão
         cm = confusion_matrix(y, y_pred)
         self._plotar_matriz_confusao(cm)
         
@@ -320,7 +315,6 @@ class EEGClassifier:
         plt.ylabel('Valor Real')
         plt.xlabel('Valor Predito')
         
-        # Salvar
         caminho = os.path.join("static", "matriz_confusao.png")
         plt.savefig(caminho, bbox_inches='tight', dpi=300)
         plt.close()
@@ -344,7 +338,6 @@ class EEGClassifier:
         if not features:
             return None
         
-        # Converte para array
         X = np.array([list(features.values())])
         X_scaled = self.scaler.transform(X)
         
@@ -390,29 +383,24 @@ def main():
     print("🧠 SISTEMA DE CLASSIFICAÇÃO EEG")
     print("=" * 50)
     
-    # Criar classificador
     classifier = EEGClassifier()
     
     try:
         # Criar dataset
-        X, y, nomes = classifier.criar_dataset(limite=20)  # 20 sinais por categoria
+        X, y, nomes = classifier.criar_dataset(limite=20)  
         
-        # Criar modelo (Random Forest é mais estável)
         classifier.criar_modelo(tipo_modelo='random_forest')
         
-        # Treinar modelo
         resultados = classifier.treinar_modelo(X, y)
         
-        # Avaliar modelo
         classifier.avaliar_modelo(X, y)
         
-        # Salvar modelo
         classifier.salvar_modelo()
         
-        # Teste com alguns sinais
+     
         print("\n🔍 TESTE DE PREDIÇÃO:")
         for i in range(min(5, len(nomes))):
-            resultado = classifier.prever_sinal(i + 1)  # IDs começam em 1
+            resultado = classifier.prever_sinal(i + 1) 
             if resultado:
                 print(f"   {nomes[i]}: {resultado['classe_predita']} "
                       f"(prob: {resultado['probabilidade']:.3f})")

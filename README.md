@@ -58,9 +58,32 @@ createdb eeg-projeto
 python data_base.py
 ```
 
-4. **Carregue os dados EEG**
+4. **Carregue os dados EEG no banco de dados**
 ```bash
-python -c "from modulo_funcoes import processar_arquivos; processar_arquivos()"
+# Execute o script que carrega todos os arquivos .txt da pasta "Sinais EEG"
+python modulo_funcoes.py
+```
+
+**⚠️ IMPORTANTE**: Este passo é **OBRIGATÓRIO** antes de usar a aplicação. O script irá:
+- Carregar 40 arquivos da categoria "SIM" (pasta `Sinais EEG/sim/`)
+- Carregar 40 arquivos da categoria "NÃO" (pasta `Sinais EEG/nao/`)
+- Total: 80 sinais EEG inseridos no banco PostgreSQL
+
+**Saída esperada:**
+```
+[OK] Inserido: s001.txt - Categoria: SIM
+[OK] Inserido: s002.txt - Categoria: SIM
+...
+[OK] Inserido: a001.txt - Categoria: NAO
+[OK] Inserido: a002.txt - Categoria: NAO
+...
+```
+
+**Se o banco estiver vazio**, você verá este erro ao iniciar a aplicação:
+```
+Categoria 'S': 0 sinais
+Categoria 'N': 0 sinais
+❌ Erro durante treinamento: Nenhuma feature foi extraída com sucesso!
 ```
 
 5. **Inicie o servidor**
@@ -281,6 +304,38 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 
 **Projeto PIBITI** - Programa Institucional de Bolsas de Iniciação em Desenvolvimento Tecnológico e Inovação
 
+## 🔧 Troubleshooting
+
+### Problemas Comuns
+
+#### 1. **Banco de dados vazio**
+**Sintoma:** Erro "Nenhuma feature foi extraída com sucesso!"
+**Solução:** Execute `python modulo_funcoes.py` para carregar os dados
+
+#### 2. **Erro de conexão com PostgreSQL**
+**Sintoma:** `psycopg2.OperationalError: connection to server failed`
+**Solução:** 
+- Verifique se o PostgreSQL está rodando
+- Confirme as credenciais em `data_base.py` e `modulo_funcoes.py`
+- Crie o banco: `createdb eeg-projeto`
+
+#### 3. **Erro de dependências**
+**Sintoma:** `ModuleNotFoundError: No module named 'psycopg2'`
+**Solução:** `pip install psycopg2-binary`
+
+#### 4. **Modelo não treinado**
+**Sintoma:** `FileNotFoundError: modelo_eeg.pkl`
+**Solução:** Acesse `/testes` e clique em "Retreinar Modelo"
+
+### Verificação Rápida do Sistema
+```bash
+# Teste completo do sistema (via interface web)
+# Acesse http://localhost:5000/testes e clique em "Executar Testes"
+
+# Ou via linha de comando
+python testes_sistema.py
+```
+
 ## 📞 Contato
 
 - 📧 Email: [seu-email@exemplo.com](mailto:seu-email@exemplo.com)
@@ -296,3 +351,34 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 ---
 
 ⭐ **Se este projeto foi útil, dê uma estrela no repositório!** 
+
+---
+
+## Como resolver
+
+A solução mais simples e garantida é **fazer downgrade do NumPy para a versão 1.x**.  
+Siga estes passos no terminal:
+
+1. **Desinstale o NumPy atual:**
+   ```
+   pip uninstall numpy
+   ```
+
+2. **Instale uma versão compatível (exemplo: 1.26.4):**
+   ```
+   pip install numpy==1.26.4
+   ```
+
+3. **(Opcional, mas recomendado) Reinstale o Matplotlib para garantir compatibilidade:**
+   ```
+   pip install --force-reinstall matplotlib
+   ```
+
+4. **Tente rodar novamente:**
+   ```
+   python app.py
+   ```
+
+---
+
+Se aparecer outro erro, envie aqui para eu te ajudar! 

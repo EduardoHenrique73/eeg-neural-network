@@ -528,8 +528,8 @@
                     <form action="{{ url_for('home') }}" method="GET" style="display: flex; gap: 0.75rem;">
                         <select class="select-control" name="categoria" onchange="this.form.submit()">
                             <option value="">Todos os Sinais</option>
-                            <option value="sim" {% if categoria == 'sim' %}selected{% endif %}>Grupo Sim</option>
-                            <option value="nao" {% if categoria == 'nao' %}selected{% endif %}>Grupo Não</option>
+                            <option value="S" {% if categoria == 'S' %}selected{% endif %}>Grupo Sim</option>
+                            <option value="N" {% if categoria == 'N' %}selected{% endif %}>Grupo Não</option>
                         </select>
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-filter"></i>
@@ -542,6 +542,11 @@
                     <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
                         <i class="fas fa-tachometer-alt"></i>
                         Dashboard
+                    </a>
+                    
+                    <a href="{{ url_for('pagina_testes') }}" class="btn btn-secondary">
+                        <i class="fas fa-vial"></i>
+                        Testes
                     </a>
                     
                     <form action="{{ url_for('retreinar') }}" method="POST" style="display: inline;">

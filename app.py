@@ -1,14 +1,24 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 import os
 import psycopg2
+import threading
+import time
+from datetime import datetime
 from dinamica_simbolica import aplicar_dinamica_simbolica
 from modulo_funcoes import gerar_grafico_interativo
 from ml_classifier import EEGClassifier
+from testes_sistema import TestadorSistema
 
 app = Flask(__name__)
 
 # Instância global do classificador
 classifier = EEGClassifier()
+
+# Variáveis globais para logs e status
+retraining_logs = []
+retraining_status = "idle"  # idle, running, completed, error
+test_logs = []
+test_status = "idle"
 
 def obter_conexao_db():
     """Conecta ao banco de dados PostgreSQL."""
@@ -22,19 +32,44 @@ def obter_conexao_db():
 
 def inicializar_classificador():
     """Inicializa o classificador, carregando modelo salvo ou treinando novo."""
+    global retraining_logs, retraining_status
+    
+    def log_retraining(mensagem):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        log_entry = f"[{timestamp}] {mensagem}"
+        retraining_logs.append(log_entry)
+        print(log_entry)
+    
     try:
+        log_retraining("🔍 Tentando carregar modelo existente...")
         classifier.carregar_modelo()
         if classifier.is_trained:
+            log_retraining("✅ Modelo carregado com sucesso!")
             return True
-    except Exception:
-        pass
+        else:
+            log_retraining("⚠️ Modelo não estava treinado, iniciando treinamento...")
+    except Exception as e:
+        log_retraining(f"⚠️ Erro ao carregar modelo: {e}")
+    
     try:
+        log_retraining("📊 Criando dataset de treinamento...")
         X, y, _ = classifier.criar_dataset(limite=20)
+        log_retraining(f"✅ Dataset criado: {X.shape[0]} amostras, {X.shape[1]} features")
+        
+        log_retraining("🧠 Criando modelo Random Forest...")
         classifier.criar_modelo(tipo_modelo='random_forest')
-        classifier.treinar_modelo(X, y)
+        
+        log_retraining("🚀 Iniciando treinamento...")
+        resultado_treino = classifier.treinar_modelo(X, y)
+        log_retraining("✅ Treinamento concluído com sucesso!")
+        
+        log_retraining("💾 Salvando modelo...")
         classifier.salvar_modelo()
+        log_retraining("✅ Modelo salvo com sucesso!")
+        
         return True
-    except Exception:
+    except Exception as e:
+        log_retraining(f"❌ Erro durante treinamento: {e}")
         return False
 
 @app.route("/")
@@ -80,17 +115,45 @@ def home():
     except Exception as erro_geral:
         return render_template("erro.html", mensagem=f"Erro ao carregar a página principal: {erro_geral}")
 
-@app.route("/retreinar", methods=["POST"])
-def retreinar():
-    """Rota para retreinar o modelo de machine learning."""
+def executar_retreinamento_background():
+    """Executa o retreinamento em background"""
+    global retraining_status, retraining_logs
+    retraining_status = "running"
+    retraining_logs.clear()
+    
     try:
         sucesso = inicializar_classificador()
         if sucesso:
-            return redirect(url_for("home"))
+            retraining_status = "completed"
         else:
-            return render_template("erro.html", mensagem="Erro ao treinar o modelo.")
+            retraining_status = "error"
     except Exception as e:
-        return render_template("erro.html", mensagem=f"Erro ao retreinar: {e}")
+        retraining_logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] ❌ Erro geral: {e}")
+        retraining_status = "error"
+
+@app.route("/retreinar", methods=["POST"])
+def retreinar():
+    """Rota para retreinar o modelo de machine learning."""
+    global retraining_status
+    
+    if retraining_status == "running":
+        return jsonify({"status": "running", "message": "Retreinamento já está em andamento"})
+    
+    # Inicia o retreinamento em background
+    thread = threading.Thread(target=executar_retreinamento_background)
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({"status": "started", "message": "Retreinamento iniciado"})
+
+@app.route("/status_retreinamento")
+def status_retreinamento():
+    """Rota para verificar o status do retreinamento"""
+    global retraining_status, retraining_logs
+    return jsonify({
+        "status": retraining_status,
+        "logs": retraining_logs
+    })
 
 @app.route("/dashboard")
 def dashboard():
@@ -158,6 +221,50 @@ def dashboard():
                              entropias=entropias)
     except Exception as e:
         return render_template("erro.html", mensagem=f"Erro ao carregar dashboard: {e}")
+
+def executar_testes_background():
+    """Executa os testes em background"""
+    global test_status, test_logs
+    test_status = "running"
+    test_logs.clear()
+    
+    try:
+        testador = TestadorSistema()
+        resultado = testador.executar_todos_testes()
+        test_logs = resultado['logs']
+        test_status = "completed"
+    except Exception as e:
+        test_logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] ❌ Erro geral nos testes: {e}")
+        test_status = "error"
+
+@app.route("/executar_testes", methods=["POST"])
+def executar_testes():
+    """Rota para executar testes do sistema"""
+    global test_status
+    
+    if test_status == "running":
+        return jsonify({"status": "running", "message": "Testes já estão em andamento"})
+    
+    # Inicia os testes em background
+    thread = threading.Thread(target=executar_testes_background)
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({"status": "started", "message": "Testes iniciados"})
+
+@app.route("/status_testes")
+def status_testes():
+    """Rota para verificar o status dos testes"""
+    global test_status, test_logs
+    return jsonify({
+        "status": test_status,
+        "logs": test_logs
+    })
+
+@app.route("/testes")
+def pagina_testes():
+    """Página para visualizar e executar testes"""
+    return render_template("testes.html")
 
 if __name__ == "__main__":
     inicializar_classificador()
