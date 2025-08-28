@@ -336,17 +336,13 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 python testes_sistema.py
 ```
 
-## 📞 Contato
-
-- 📧 Email: [seu-email@exemplo.com](mailto:seu-email@exemplo.com)
-- 🐱 GitHub: [@seu-usuario](https://github.com/seu-usuario)
-- 📋 Issues: [Reportar problemas](https://github.com/seu-usuario/eeg-visualizer-pro/issues)
 
 ## 🏆 Agradecimentos
 
-- Equipe do laboratório de neurociência
+- Equipe do laboratório de neurociência e banco de dados
 - Coordenação do programa PIBITI
 - Comunidade Python científica
+- Professor/ Dr. Lynwood Livy
 
 ---
 
