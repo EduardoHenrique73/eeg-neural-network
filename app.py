@@ -10,11 +10,12 @@ from ml_classifier import EEGClassifier
 from testes_sistema import TestadorSistema
 import numpy as np
 import uuid
+from config import config
 
 app = Flask(__name__)
 
 # Configuração para upload de arquivos
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
+app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -30,13 +31,7 @@ test_status = "idle"
 
 def obter_conexao_db():
     """Conecta ao banco de dados PostgreSQL."""
-    return psycopg2.connect(
-        dbname="eeg-projeto",
-        user="postgres",
-        password="EEG@321",
-        host="localhost",
-        port="5432"
-    )
+    return psycopg2.connect(**config.get_db_connection_string())
 
 def inicializar_classificador():
     """Inicializa o classificador, carregando modelo salvo ou treinando novo."""
@@ -465,5 +460,12 @@ def upload_eeg():
         return jsonify({'erro': f'Erro interno: {str(e)}'})
 
 if __name__ == "__main__":
+    # Mostrar configurações ao iniciar
+    config.print_config()
+    
     inicializar_classificador()
-    app.run(debug=True, port=5000)
+    app.run(
+        debug=config.FLASK_DEBUG, 
+        port=config.FLASK_PORT,
+        host=config.FLASK_HOST
+    )

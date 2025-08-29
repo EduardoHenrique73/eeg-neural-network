@@ -14,6 +14,7 @@ import seaborn as sns
 from dinamica_simbolica import aplicar_dinamica_simbolica
 import os
 import pickle
+from config import config
 
 class EEGClassifier:
     """Classificador de sinais EEG usando machine learning"""
@@ -26,13 +27,7 @@ class EEGClassifier:
         
     def obter_conexao_db(self):
         """Conecta ao banco de dados PostgreSQL"""
-        return psycopg2.connect(
-            dbname="eeg-projeto",
-            user="postgres",
-            password="EEG@321",
-            host="localhost",
-            port="5432"
-        )
+        return psycopg2.connect(**config.get_db_connection_string())
     
     def extrair_features_sinal(self, id_sinal):
         """
@@ -351,7 +346,9 @@ class EEGClassifier:
             'features': features
         }
     
-    def salvar_modelo(self, caminho='modelo_eeg.pkl'):
+    def salvar_modelo(self, caminho=None):
+        if caminho is None:
+            caminho = config.MODEL_PATH
         """Salva o modelo treinado"""
         if self.is_trained:
             with open(caminho, 'wb') as f:
@@ -365,7 +362,9 @@ class EEGClassifier:
         else:
             print("❌ Modelo não foi treinado ainda!")
     
-    def carregar_modelo(self, caminho='modelo_eeg.pkl'):
+    def carregar_modelo(self, caminho=None):
+        if caminho is None:
+            caminho = config.MODEL_PATH
         """Carrega um modelo salvo"""
         if os.path.exists(caminho):
             with open(caminho, 'rb') as f:
