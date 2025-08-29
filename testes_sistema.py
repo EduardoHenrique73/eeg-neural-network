@@ -175,7 +175,8 @@ class TestadorSistema:
             # Teste 1: Carregar modelo existente
             self.log("  Testando carregamento de modelo...")
             try:
-                classifier.carregar_modelo()
+                from config import config
+                classifier.carregar_modelo(config.MODEL_PATH)
                 if classifier.is_trained:
                     self.log("    ✅ Modelo carregado com sucesso")
                     modelo_status = "CARREGADO"
