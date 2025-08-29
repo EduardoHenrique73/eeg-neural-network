@@ -8,8 +8,16 @@ from dinamica_simbolica import aplicar_dinamica_simbolica
 from modulo_funcoes import gerar_grafico_interativo
 from ml_classifier import EEGClassifier
 from testes_sistema import TestadorSistema
+import numpy as np
+import uuid
 
 app = Flask(__name__)
+
+# Configuração para upload de arquivos
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
+UPLOAD_FOLDER = 'uploads'
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
 # Instância global do classificador
 classifier = EEGClassifier()
@@ -182,7 +190,7 @@ def dashboard():
             FROM sinais s
             JOIN usuarios u ON s.idusuario = u.id
             ORDER BY s.id DESC
-            LIMIT 10
+            LIMIT 40
         """)
         sinais_amostra = cursor.fetchall()
         for sinal_id, nome, categoria in sinais_amostra:
@@ -265,6 +273,196 @@ def status_testes():
 def pagina_testes():
     """Página para visualizar e executar testes"""
     return render_template("testes.html")
+
+def processar_arquivo_eeg(arquivo):
+    """
+    Processa um arquivo EEG enviado pelo usuário
+    """
+    try:
+        print(f"🔍 Processando arquivo: {arquivo.filename}")
+        
+        # Verificar se é um arquivo válido
+        if arquivo.filename == '':
+            return {'erro': 'Nenhum arquivo selecionado'}
+        
+        if not arquivo.filename.endswith('.txt'):
+            return {'erro': 'Apenas arquivos .txt são aceitos'}
+        
+        # Gerar nome único para o arquivo
+        nome_arquivo = f"upload_{uuid.uuid4().hex[:8]}_{arquivo.filename}"
+        caminho_arquivo = os.path.join(UPLOAD_FOLDER, nome_arquivo)
+        
+        # Salvar arquivo
+        arquivo.save(caminho_arquivo)
+        
+        # Ler dados do arquivo
+        try:
+            with open(caminho_arquivo, 'r') as f:
+                linhas = f.readlines()
+            
+            # Processar linhas (remover espaços, quebras de linha, etc.)
+            valores = []
+            for linha in linhas:
+                linha = linha.strip()
+                if linha and linha.replace('.', '').replace('-', '').isdigit():
+                    valores.append(float(linha))
+            
+            if len(valores) == 0:
+                return {'erro': 'Nenhum valor numérico encontrado no arquivo'}
+            
+            print(f"📊 Valores lidos: {len(valores)} amostras")
+            
+            # Inserir no banco de dados
+            try:
+                conexao = obter_conexao_db()
+                print("✅ Conexão com banco estabelecida")
+            except Exception as e:
+                return {'erro': f'Erro de conexão com banco: {str(e)}'}
+            cursor = conexao.cursor()
+            
+            # Criar usuário temporário (sem categoria - usar 'N' como padrão)
+            cursor.execute("""
+                INSERT INTO usuarios (possui) 
+                VALUES (%s) RETURNING id
+            """, ('N',))
+            id_usuario = cursor.fetchone()[0]
+            
+            # Criar sinal
+            cursor.execute("""
+                INSERT INTO sinais (nome, idusuario) 
+                VALUES (%s, %s) RETURNING id
+            """, (nome_arquivo, id_usuario))
+            id_sinal = cursor.fetchone()[0]
+            
+            # Inserir valores
+            for valor in valores:
+                cursor.execute("""
+                    INSERT INTO valores_sinais (idsinal, valor) 
+                    VALUES (%s, %s)
+                """, (id_sinal, valor))
+            
+            conexao.commit()
+            cursor.close()
+            conexao.close()
+            
+            # Aplicar dinâmica simbólica
+            try:
+                print(f"🔧 Aplicando dinâmica simbólica para sinal {id_sinal}")
+                resultado_ds = aplicar_dinamica_simbolica(id_sinal, m=3)
+                
+                if resultado_ds is None:
+                    print("❌ Resultado da dinâmica simbólica é None")
+                    return {'erro': 'Erro ao processar dinâmica simbólica'}
+                
+                print(f"✅ Dinâmica simbólica aplicada com sucesso")
+                print(f"📊 Resultado DS: {resultado_ds}")
+            except Exception as e:
+                print(f"❌ Erro na dinâmica simbólica: {str(e)}")
+                return {'erro': f'Erro na dinâmica simbólica: {str(e)}'}
+            
+            # Fazer predição se o modelo estiver treinado
+            predicao = None
+            if classifier.is_trained:
+                try:
+                    predicao_raw = classifier.prever_sinal(id_sinal)
+                    # Converter tipos NumPy para Python nativos
+                    if predicao_raw:
+                        predicao = {
+                            'classe_predita': str(predicao_raw.get('classe_predita', '')),
+                            'probabilidade': float(predicao_raw.get('probabilidade', 0.0))
+                        }
+                except Exception as e:
+                    print(f"Erro na predição: {e}")
+            
+            # Calcular confiança baseada na entropia
+            entropia = float(resultado_ds.get('entropia', 0))
+            print(f"🔍 Entropia calculada: {entropia}")
+            print(f"🔍 Tipo da entropia: {type(entropia)}")
+            
+            # Análise de confiança baseada na entropia
+            if entropia < 0.3:
+                confianca = "Baixa"
+                confianca_porcentagem = 30
+                confianca_descricao = "Sinal muito previsível, baixa complexidade"
+            elif entropia < 0.6:
+                confianca = "Média"
+                confianca_porcentagem = 60
+                confianca_descricao = "Sinal com complexidade moderada"
+            elif entropia < 0.8:
+                confianca = "Alta"
+                confianca_porcentagem = 80
+                confianca_descricao = "Sinal com boa complexidade e variabilidade"
+            else:
+                confianca = "Muito Alta"
+                confianca_porcentagem = 95
+                confianca_descricao = "Sinal muito complexo e imprevisível"
+            
+            print(f"✅ Confiança calculada: {confianca} ({confianca_porcentagem}%)")
+            print(f"📝 Descrição: {confianca_descricao}")
+            
+            # Debug dos dados retornados
+            print(f"🔍 Dados do resultado_ds:")
+            print(f"  - entropia: {resultado_ds.get('entropia')}")
+            print(f"  - limiar: {resultado_ds.get('limiar')}")
+            print(f"  - sequencia_binaria: {len(resultado_ds.get('sequencia_binaria', []))} elementos")
+            print(f"  - grupos_binarios: {len(resultado_ds.get('grupos_binarios', []))} elementos")
+            
+            # Preparar resultados
+            resultados = {
+                'id_sinal': int(id_sinal),
+                'nome_arquivo': arquivo.filename,
+                'total_amostras': int(len(valores)),
+                'entropia': entropia,
+                'limiar': float(resultado_ds.get('limiar', 0)),
+                'confianca': confianca,
+                'confianca_porcentagem': confianca_porcentagem,
+                'confianca_descricao': confianca_descricao,
+                'url_histograma': f"/static/{os.path.basename(resultado_ds.get('caminho_histograma', ''))}",
+                'url_sequencia': f"/static/{os.path.basename(resultado_ds.get('caminho_sequencia', ''))}",
+                'sequencia_binaria': [int(x) for x in resultado_ds.get('sequencia_binaria', [])[:20]],
+                'grupos_binarios': [int(x) for x in resultado_ds.get('grupos_binarios', [])[:10]],
+                'predicao': predicao,
+                'sucesso': True
+            }
+            
+
+            
+            return resultados
+            
+        except Exception as e:
+            return {'erro': f'Erro ao processar arquivo: {str(e)}'}
+            
+    except Exception as e:
+        return {'erro': f'Erro geral: {str(e)}'}
+
+@app.route("/upload")
+def pagina_upload():
+    """
+    Página dedicada para upload de arquivos EEG
+    """
+    return render_template("upload.html")
+
+@app.route("/upload_eeg", methods=["POST"])
+def upload_eeg():
+    """
+    Rota para upload e processamento de arquivo EEG
+    """
+    print(f"📥 Recebendo upload: {request.files}")
+    
+    if 'arquivo' not in request.files:
+        print("❌ Nenhum arquivo encontrado na requisição")
+        return jsonify({'erro': 'Nenhum arquivo enviado'})
+    
+    arquivo = request.files['arquivo']
+    print(f"📁 Processando arquivo: {arquivo.filename}")
+    
+    try:
+        resultado = processar_arquivo_eeg(arquivo)
+        print(f"✅ Processamento concluído: {resultado.get('sucesso', False)}")
+        return jsonify(resultado)
+    except Exception as e:
+        print(f"❌ Erro no processamento: {str(e)}")
+        return jsonify({'erro': f'Erro interno: {str(e)}'})
 
 if __name__ == "__main__":
     inicializar_classificador()

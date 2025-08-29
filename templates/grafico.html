@@ -549,6 +549,11 @@
                         Testes
                     </a>
                     
+                    <a href="{{ url_for('pagina_upload') }}" class="btn btn-secondary">
+                        <i class="fas fa-upload"></i>
+                        Upload EEG
+                    </a>
+                    
                     <form action="{{ url_for('retreinar') }}" method="POST" style="display: inline;">
                         <button type="submit" class="btn btn-secondary">
                             <i class="fas fa-brain"></i>
@@ -556,6 +561,8 @@
                         </button>
                     </form>
                 </div>
+                
+
             </div>
         </div>
     </header>
@@ -600,6 +607,8 @@
             </div>
         </section>
         {% endif %}
+
+
 
         <!-- Análise Detalhada por Sinal -->
         {% for hist in histogramas %}
@@ -802,6 +811,8 @@
         document.querySelector('.select-control').addEventListener('change', function() {
             this.form.submit();
         });
+
+
     </script>
 </body>
 </html>
