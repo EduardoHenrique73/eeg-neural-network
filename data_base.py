@@ -14,7 +14,7 @@ def criar_banco():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
-        possui CHAR(1) NOT NULL CHECK (possui IN ('S', 'N'))
+        possui CHAR(1) NOT NULL CHECK (possui IN ('S', 'N', 'U'))
     )
     """)
 

@@ -139,6 +139,31 @@ pip install -r requirements.txt
 - Confirme que contém apenas valores numéricos (um por linha)
 - Verifique o tamanho do arquivo (máximo 16MB)
 
+### **Problemas com NumPy/Matplotlib**
+1. **Desinstale versões conflitantes:**
+   ```
+   pip uninstall numpy matplotlib
+   ```
+
+2. **Instale uma versão compatível (exemplo: 1.26.4):**
+   ```
+   pip install numpy==1.26.4
+   ```
+
+3. **(Opcional, mas recomendado) Reinstale o Matplotlib para garantir compatibilidade:**
+   ```
+   pip install --force-reinstall matplotlib
+   ```
+
+4. **Tente rodar novamente:**
+   ```
+   python app.py
+   ```
+
+---
+
+Se aparecer outro erro, envie aqui para eu te ajudar!
+
 ## 📈 Logs e Monitoramento
 
 O sistema possui logs detalhados para:
@@ -159,4 +184,11 @@ Acesse `/testes` para ver todos os logs em tempo real.
 
 ## 📄 Licença
 
-Este projeto é parte do PIBITI - Programa Institucional de Bolsas de Iniciação em Desenvolvimento Tecnológico e Inovação. 
+Este projeto é parte do PIBITI - Programa Institucional de Bolsas de Iniciação em Desenvolvimento Tecnológico e Inovação.
+
+## 🙏 Agradecimentos
+
+- Equipe do laboratório de neurociência e banco de dados
+- Coordenação do programa PIBITI
+- Comunidade Python científica
+- Professor/ Dr. Lynwood Livy 

@@ -320,11 +320,11 @@ def processar_arquivo_eeg(arquivo):
                 return {'erro': f'Erro de conexão com banco: {str(e)}'}
             cursor = conexao.cursor()
             
-            # Criar usuário temporário (sem categoria - usar 'N' como padrão)
+            # Criar usuário temporário (categoria 'U' para uploads - desconhecida)
             cursor.execute("""
                 INSERT INTO usuarios (possui) 
                 VALUES (%s) RETURNING id
-            """, ('N',))
+            """, ('U',))
             id_usuario = cursor.fetchone()[0]
             
             # Criar sinal
