@@ -61,11 +61,18 @@
             <span>Upload</span>
           </a>
           <a
-            href="{{ url_for('pagina_teste_ia') }}"
-            class="nav-link {% if request.endpoint == 'pagina_teste_ia' %}active{% endif %}"
+            href="{{ url_for('pagina_testes') }}"
+            class="nav-link {% if request.endpoint == 'pagina_testes' %}active{% endif %}"
           >
             <i class="fas fa-vial"></i>
-            <span>Teste IA</span>
+            <span>Testes</span>
+          </a>
+          <a
+            href="{{ url_for('pagina_teste_precisao') }}"
+            class="nav-link {% if request.endpoint == 'pagina_teste_precisao' %}active{% endif %}"
+          >
+            <i class="fas fa-bullseye"></i>
+            <span>Teste Precisão</span>
           </a>
           <a
             href="{{ url_for('pagina_comparador') }}"

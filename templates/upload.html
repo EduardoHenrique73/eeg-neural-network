@@ -486,7 +486,7 @@
         formData.append('categoria', categoria);
         
         // Fazer upload
-        fetch('/upload', {
+        fetch('/upload_eeg', {
             method: 'POST',
             body: formData
         })
@@ -496,13 +496,18 @@
             document.getElementById('progressFill').style.width = '100%';
             document.getElementById('progressText').textContent = 'Upload concluído!';
             
-            if (data.success) {
-                Utils.showMessage('Arquivo enviado com sucesso!', 'success');
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 1500);
+            if (data.sucesso) {
+                // Mostrar resultado da predição
+                if (data.predicao) {
+                    mostrarResultadoPredicao(data);
+                } else {
+                    Utils.showMessage('Arquivo enviado com sucesso!', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1500);
+                }
             } else {
-                Utils.showMessage(data.error || 'Erro no upload', 'error');
+                Utils.showMessage(data.erro || 'Erro no upload', 'error');
                 resetUpload();
             }
         })
@@ -512,5 +517,133 @@
             resetUpload();
         });
     });
+    
+    function mostrarResultadoPredicao(data) {
+        const predicao = data.predicao;
+        const idSinal = data.id_sinal;
+        const nomeSinal = data.nome_sinal;
+        
+        // Criar modal de resultado
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        `;
+        
+        modal.innerHTML = `
+            <div style="
+                background: white;
+                padding: 2rem;
+                border-radius: 0.5rem;
+                max-width: 500px;
+                width: 90%;
+                text-align: center;
+            ">
+                <h2 style="color: #374151; margin-bottom: 1rem;">🎯 Resultado da IA</h2>
+                
+                <div style="margin-bottom: 1.5rem;">
+                    <p style="color: #6b7280; margin-bottom: 0.5rem;">Arquivo: ${nomeSinal}</p>
+                    <div style="
+                        background: ${predicao.classe_predita === 'Sim' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)'};
+                        color: ${predicao.classe_predita === 'Sim' ? '#16a34a' : '#dc2626'};
+                        padding: 1rem;
+                        border-radius: 0.25rem;
+                        font-size: 1.25rem;
+                        font-weight: 700;
+                        margin: 1rem 0;
+                    ">
+                        Predição: ${predicao.classe_predita}
+                        <br>
+                        <small>Confiança: ${(predicao.probabilidade * 100).toFixed(1)}%</small>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 1.5rem;">
+                    <p style="color: #374151; font-weight: 600; margin-bottom: 0.5rem;">Qual é a categoria real?</p>
+                    <div style="display: flex; gap: 1rem; justify-content: center;">
+                        <button onclick="marcarCategoriaReal(${idSinal}, 'S')" style="
+                            padding: 0.75rem 1.5rem;
+                            background: rgba(34, 197, 94, 0.1);
+                            color: #16a34a;
+                            border: 1px solid #16a34a;
+                            border-radius: 0.25rem;
+                            font-weight: 600;
+                            cursor: pointer;
+                        ">
+                            ✅ Sim
+                        </button>
+                        <button onclick="marcarCategoriaReal(${idSinal}, 'N')" style="
+                            padding: 0.75rem 1.5rem;
+                            background: rgba(239, 68, 68, 0.1);
+                            color: #dc2626;
+                            border: 1px solid #dc2626;
+                            border-radius: 0.25rem;
+                            font-weight: 600;
+                            cursor: pointer;
+                        ">
+                            ❌ Não
+                        </button>
+                    </div>
+                </div>
+                
+                <button onclick="fecharModal()" style="
+                    padding: 0.5rem 1rem;
+                    background: #6b7280;
+                    color: white;
+                    border: none;
+                    border-radius: 0.25rem;
+                    cursor: pointer;
+                ">
+                    Fechar
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+    }
+    
+    function marcarCategoriaReal(idSinal, categoria) {
+        fetch('/marcar_categoria_real', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                id_sinal: idSinal,
+                categoria_real: categoria
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.sucesso) {
+                Utils.showMessage(data.mensagem, 'success');
+                fecharModal();
+                resetUpload();
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1500);
+            } else {
+                Utils.showMessage(data.erro, 'error');
+            }
+        })
+        .catch(error => {
+            Utils.showMessage('Erro ao marcar categoria', 'error');
+        });
+    }
+    
+    function fecharModal() {
+        const modal = document.querySelector('div[style*="position: fixed"]');
+        if (modal) {
+            modal.remove();
+        }
+    }
 </script>
 {% endblock %}

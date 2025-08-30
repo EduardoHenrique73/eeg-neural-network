@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}Teste de Precisão da IA - EEG Neural Network{% endblock %}
+
+{% block extra_head %}
+<style>
+    .precisao-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: var(--spacing-6);
+    }
+    
+    .precisao-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        color: white;
+        padding: var(--spacing-8);
+        border-radius: var(--border-radius-lg);
+        margin-bottom: var(--spacing-6);
+        text-align: center;
+    }
+    
+    .precisao-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: var(--spacing-6);
+        margin-bottom: var(--spacing-8);
+    }
+    
+    .stat-card {
+        background: var(--white);
+        padding: var(--spacing-6);
+        border-radius: var(--border-radius-lg);
+        box-shadow: var(--shadow-md);
+        text-align: center;
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: var(--spacing-2);
+    }
+    
+    .stat-label {
+        color: var(--gray-600);
+        font-weight: 500;
+    }
+    
+    .sinais-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: var(--spacing-6);
+    }
+    
+    .sinal-card {
+        background: var(--white);
+        border-radius: var(--border-radius-lg);
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+        transition: var(--transition);
+    }
+    
+    .sinal-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .sinal-header {
+        background: var(--gray-50);
+        padding: var(--spacing-4);
+        border-bottom: 1px solid var(--gray-200);
+    }
+    
+    .sinal-nome {
+        font-weight: 600;
+        color: var(--gray-900);
+        margin-bottom: var(--spacing-2);
+    }
+    
+    .sinal-id {
+        color: var(--gray-500);
+        font-size: 0.9rem;
+    }
+    
+    .sinal-content {
+        padding: var(--spacing-4);
+    }
+    
+    .predicao-section {
+        margin-bottom: var(--spacing-4);
+    }
+    
+    .predicao-label {
+        font-weight: 600;
+        color: var(--gray-700);
+        margin-bottom: var(--spacing-2);
+    }
+    
+    .predicao-value {
+        font-size: 1.2rem;
+        font-weight: 700;
+        padding: var(--spacing-2) var(--spacing-3);
+        border-radius: var(--border-radius);
+        display: inline-block;
+    }
+    
+    .predicao-sim {
+        background: rgba(34, 197, 94, 0.1);
+        color: #16a34a;
+    }
+    
+    .predicao-nao {
+        background: rgba(239, 68, 68, 0.1);
+        color: #dc2626;
+    }
+    
+    .categoria-buttons {
+        display: flex;
+        gap: var(--spacing-2);
+        margin-top: var(--spacing-3);
+    }
+    
+    .btn-categoria {
+        flex: 1;
+        padding: var(--spacing-2) var(--spacing-3);
+        border: none;
+        border-radius: var(--border-radius);
+        font-weight: 600;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+    
+    .btn-sim {
+        background: rgba(34, 197, 94, 0.1);
+        color: #16a34a;
+        border: 1px solid #16a34a;
+    }
+    
+    .btn-sim:hover {
+        background: #16a34a;
+        color: white;
+    }
+    
+    .btn-nao {
+        background: rgba(239, 68, 68, 0.1);
+        color: #dc2626;
+        border: 1px solid #dc2626;
+    }
+    
+    .btn-nao:hover {
+        background: #dc2626;
+        color: white;
+    }
+    
+    .btn-marcado {
+        background: var(--primary-color);
+        color: white;
+        border-color: var(--primary-color);
+    }
+    
+    .loading {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="precisao-container">
+    <!-- Header -->
+    <div class="precisao-header">
+        <h1>🎯 Teste de Precisão da IA</h1>
+        <p>Teste a precisão da IA com dados que ela nunca viu antes</p>
+    </div>
+    
+    <!-- Estatísticas -->
+    <div class="precisao-stats">
+        <div class="stat-card">
+            <div class="stat-value" id="precisao-valor">{{ precisao.precisao }}%</div>
+            <div class="stat-label">Precisão Geral</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="total-testes">{{ precisao.total }}</div>
+            <div class="stat-label">Total de Testes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="acertos">{{ precisao.acertos }}</div>
+            <div class="stat-label">Acertos</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="erros">{{ precisao.total - precisao.acertos }}</div>
+            <div class="stat-label">Erros</div>
+        </div>
+    </div>
+    
+    <!-- Lista de Sinais -->
+    <h2>Sinais para Teste</h2>
+    <p style="color: #6b7280; margin-bottom: 1rem;">
+        Faça upload de arquivos EEG na página de Upload e depois volte aqui para testar a precisão da IA.
+    </p>
+    
+    {% if sinais %}
+    <div class="sinais-grid">
+        {% for sinal in sinais %}
+        <div class="sinal-card" data-sinal-id="{{ sinal[0] }}">
+            <div class="sinal-header">
+                <div class="sinal-nome">{{ sinal[1] }}</div>
+                <div class="sinal-id">ID: {{ sinal[0] }}</div>
+            </div>
+            
+            <div class="sinal-content">
+                <div class="predicao-section">
+                    <div class="predicao-label">Predição da IA:</div>
+                    <div class="predicao-value predicao-{{ 'sim' if sinal[2] == 'S' else 'nao' }}" id="predicao-{{ sinal[0] }}">
+                        Processando...
+                    </div>
+                </div>
+                
+                <div class="predicao-section">
+                    <div class="predicao-label">Categoria Real:</div>
+                    <div class="categoria-buttons">
+                        <button class="btn-categoria btn-sim" onclick="alert('Funcionalidade em desenvolvimento')" id="btn-sim-{{ sinal[0] }}">
+                            ✅ Sim
+                        </button>
+                        <button class="btn-categoria btn-nao" onclick="alert('Funcionalidade em desenvolvimento')" id="btn-nao-{{ sinal[0] }}">
+                            ❌ Não
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 2rem; background: #f9fafb; border-radius: 0.5rem; margin-top: 2rem;">
+        <h3 style="color: #374151; margin-bottom: 0.5rem;">Nenhum sinal encontrado</h3>
+        <p style="color: #6b7280;">Faça upload de arquivos EEG primeiro para testar a precisão da IA.</p>
+        <a href="{{ url_for('pagina_upload') }}" style="display: inline-block; margin-top: 1rem; padding: 0.5rem 1rem; background: var(--primary-color); color: white; text-decoration: none; border-radius: 0.25rem;">
+            Fazer Upload
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,10 +1,12 @@
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 from collections import Counter
 import psycopg2
 import matplotlib
 matplotlib.use('Agg')  # Backend não interativo para servidores
+matplotlib.rcParams['figure.max_open_warning'] = 0  # Desabilitar avisos de figuras
+import matplotlib.pyplot as plt
+plt.ioff()  # Desabilitar modo interativo
 from config import config
 
 def obter_conexao_db():
@@ -123,7 +125,8 @@ def plotar_sequencia_binaria(sequencia, nome_base):
     nome_arquivo = f"{nome_base}_sequencia.png"
     caminho = os.path.join("static", nome_arquivo)
     plt.savefig(caminho, bbox_inches='tight')
-    plt.close()
+    plt.close('all')  # Fechar todas as figuras
+    plt.clf()  # Limpar figura atual
 
     return caminho
 

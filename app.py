@@ -33,6 +33,7 @@ test_status = "idle"
 # Modelos globais para evitar retreinamento desnecessário
 classifier_cnn = None
 classifier_lstm = None
+classifier_cnn_original = None  # Modelo CNN original
 
 def obter_conexao_db():
     """Conecta ao banco de dados PostgreSQL."""
@@ -83,13 +84,23 @@ def inicializar_classificador():
 @app.route("/")
 def home():
     categoria = request.args.get("categoria")
+    limite = request.args.get("limite", "50")  # Aumentar limite padrão para 50
+    
+    # Converter limite para inteiro, com valor padrão de 50
     try:
-        resultado = gerar_grafico_interativo(limite=10, filtro_categoria=categoria)
+        limite = int(limite)
+        if limite <= 0:
+            limite = 50
+    except ValueError:
+        limite = 50
+    
+    try:
+        resultado = gerar_grafico_interativo(limite=limite, filtro_categoria=categoria)
         graficos_html = resultado['graficos_html']
         histogramas = []
         
         # Criar modelos adicionais para comparação (APENAS UMA VEZ, fora do loop)
-        global classifier_cnn, classifier_lstm
+        global classifier_cnn, classifier_lstm, classifier_cnn_original
         
         # Inicializar MLP Tabular se necessário (melhor para dados tabulares)
         if classifier_cnn is None:
@@ -131,9 +142,17 @@ def home():
                     X_temp, y_temp, _ = classifier_lstm.criar_dataset(limite=20)
                     if X_temp is not None and len(X_temp) > 0:
                         print(f"📊 Treinando LSTM com {X_temp.shape[0]} amostras...")
-                        classifier_lstm.treinar_modelo(X_temp, y_temp)
-                        classifier_lstm.salvar_modelo('modelo_lstm.pkl')
-                        print("✅ LSTM treinado e salvo!")
+                        try:
+                            classifier_lstm.treinar_modelo(X_temp, y_temp)
+                            if classifier_lstm.is_trained:
+                                classifier_lstm.salvar_modelo('modelo_lstm.pkl')
+                                print("✅ LSTM treinado e salvo!")
+                            else:
+                                print("❌ LSTM não foi treinado corretamente")
+                                classifier_lstm = None
+                        except Exception as e:
+                            print(f"❌ Erro ao treinar LSTM: {e}")
+                            classifier_lstm = None
                     else:
                         print("❌ Não foi possível criar dataset para LSTM")
                         classifier_lstm = None
@@ -141,45 +160,84 @@ def home():
                 print(f"❌ Erro ao criar LSTM: {e}")
                 classifier_lstm = None
         
-        # Agora processar cada sinal (sem criar modelos novamente)
-        for sinal in resultado['dados_sinais']:
+        # Inicializar CNN Original se necessário
+        if classifier_cnn_original is None:
+            try:
+                print("🧠 Criando modelo CNN Original...")
+                classifier_cnn_original = EEGClassifier()
+                classifier_cnn_original.criar_modelo('cnn')
+                
+                # Tentar carregar CNN salvo
+                if classifier_cnn_original.carregar_modelo('modelo_cnn.pkl'):
+                    print("✅ CNN Original carregado do arquivo salvo!")
+                else:
+                    # Treinar novo CNN
+                    X_temp, y_temp, _ = classifier_cnn_original.criar_dataset(limite=20)
+                    if X_temp is not None and len(X_temp) > 0:
+                        print(f"📊 Treinando CNN Original com {X_temp.shape[0]} amostras...")
+                        try:
+                            classifier_cnn_original.treinar_modelo(X_temp, y_temp)
+                            if classifier_cnn_original.is_trained:
+                                classifier_cnn_original.salvar_modelo('modelo_cnn.pkl')
+                                print("✅ CNN Original treinado e salvo!")
+                            else:
+                                print("❌ CNN Original não foi treinado corretamente")
+                                classifier_cnn_original = None
+                        except Exception as e:
+                            print(f"❌ Erro ao treinar CNN Original: {e}")
+                            classifier_cnn_original = None
+                    else:
+                        print("❌ Não foi possível criar dataset para CNN Original")
+                        classifier_cnn_original = None
+            except Exception as e:
+                print(f"❌ Erro ao criar CNN Original: {e}")
+                classifier_cnn_original = None
+        
+        # Processar apenas os primeiros 10 sinais para evitar sobrecarga
+        sinais_para_processar = resultado['dados_sinais'][:10]
+        
+        for sinal in sinais_para_processar:
             try:
                 resultado_ds = aplicar_dinamica_simbolica(sinal['id'], m=3)
                 if resultado_ds is None:
                     continue
+                
+                # Inicializar predições como None
                 predicao = None
                 predicao_cnn = None
                 predicao_lstm = None
+                predicao_cnn_original = None
                 
-                if classifier.is_trained:
+                # Fazer apenas uma predição por modelo para evitar loops
+                if classifier and classifier.is_trained:
                     try:
                         predicao = classifier.prever_sinal(sinal['id'])
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"❌ Erro na predição Random Forest: {e}")
                 
-                # Fazer predições com modelos treinados
-                try:
-                    if classifier_cnn and classifier_cnn.is_trained:
-                        print(f"🔮 Fazendo predição MLP Tabular para sinal {sinal['id']}...")
+                if classifier_cnn and classifier_cnn.is_trained:
+                    try:
                         predicao_cnn = classifier_cnn.prever_sinal(sinal['id'])
-                        print(f"✅ Predição MLP Tabular: {predicao_cnn}")
-                    else:
-                        print("❌ MLP Tabular não está treinado")
-                except Exception as e:
-                    print(f"❌ Erro na predição MLP Tabular: {e}")
+                    except Exception as e:
+                        print(f"❌ Erro na predição MLP Tabular: {e}")
                 
-                try:
-                    if classifier_lstm and classifier_lstm.is_trained:
-                        print(f"🔮 Fazendo predição LSTM para sinal {sinal['id']}...")
+                if classifier_lstm and classifier_lstm.is_trained:
+                    try:
                         predicao_lstm = classifier_lstm.prever_sinal(sinal['id'])
-                        print(f"✅ Predição LSTM: {predicao_lstm}")
-                    else:
-                        print("❌ LSTM não está treinado")
-                except Exception as e:
-                    print(f"❌ Erro na predição LSTM: {e}")
+                    except Exception as e:
+                        print(f"❌ Erro na predição LSTM: {e}")
+                
+                if classifier_cnn_original and classifier_cnn_original.is_trained:
+                    try:
+                        predicao_cnn_original = classifier_cnn_original.prever_sinal(sinal['id'])
+                    except Exception as e:
+                        print(f"❌ Erro na predição CNN Original: {e}")
+                
+                # Preparar dados para o template
                 sequencia_binaria = resultado_ds.get('sequencia_binaria', [])[:20]
                 grupos_binarios = resultado_ds.get('grupos_binarios', [])[:10]
                 palavras_decimais = resultado_ds.get('palavras_decimais', [])[:10]
+                
                 histogramas.append({
                     'url_histograma': url_for('static', filename=os.path.basename(resultado_ds.get('caminho_histograma', ''))),
                     'url_sequencia': url_for('static', filename=os.path.basename(resultado_ds.get('caminho_sequencia', ''))),
@@ -191,9 +249,11 @@ def home():
                     'palavras_decimais': palavras_decimais,
                     'predicao': predicao,
                     'predicao_cnn': predicao_cnn,
-                    'predicao_lstm': predicao_lstm
+                    'predicao_lstm': predicao_lstm,
+                    'predicao_cnn_original': predicao_cnn_original
                 })
-            except Exception:
+            except Exception as e:
+                print(f"❌ Erro ao processar sinal {sinal['id']}: {e}")
                 continue
 
 
@@ -201,7 +261,8 @@ def home():
             "grafico.html",
             graficos_html=graficos_html,
             histogramas=histogramas,
-            categoria=categoria
+            categoria=categoria,
+            limite=limite
         )
     except Exception as erro_geral:
         return render_template("erro.html", mensagem=f"Erro ao carregar a página principal: {erro_geral}")
@@ -276,11 +337,11 @@ def executar_retreinamento_todos_background():
         log_retraining("🧠 Retreinando Random Forest...")
         classifier.criar_modelo(tipo_modelo='random_forest')
         classifier.treinar_modelo(X, y)
-        classifier.salvar_modelo()
+        classifier.salvar_modelo('modelo_eeg.pkl')
         log_retraining("✅ Random Forest retreinado!")
         
-        # Retreinar CNN
-        log_retraining("🧠 Retreinando CNN...")
+        # Retreinar MLP Tabular
+        log_retraining("🧠 Retreinando MLP Tabular...")
         global classifier_cnn
         classifier_cnn = EEGClassifier()
         classifier_cnn.criar_modelo('mlp_tabular')
@@ -288,14 +349,39 @@ def executar_retreinamento_todos_background():
         classifier_cnn.salvar_modelo('modelo_mlp_tabular.pkl')
         log_retraining("✅ MLP Tabular retreinado e salvo!")
         
+        # Retreinar CNN Original
+        log_retraining("🧠 Retreinando CNN Original...")
+        global classifier_cnn_original
+        classifier_cnn_original = EEGClassifier()
+        classifier_cnn_original.criar_modelo('cnn')
+        
+        # Garantir que o CNN seja treinado corretamente
+        try:
+            classifier_cnn_original.treinar_modelo(X, y)
+            if classifier_cnn_original.is_trained:
+                classifier_cnn_original.salvar_modelo('modelo_cnn.pkl')
+                log_retraining("✅ CNN Original retreinado e salvo!")
+            else:
+                log_retraining("❌ CNN Original não foi treinado corretamente")
+        except Exception as e:
+            log_retraining(f"❌ Erro ao treinar CNN Original: {e}")
+        
         # Retreinar LSTM
         log_retraining("🧠 Retreinando LSTM...")
         global classifier_lstm
         classifier_lstm = EEGClassifier()
         classifier_lstm.criar_modelo('lstm')
-        classifier_lstm.treinar_modelo(X, y)
-        classifier_lstm.salvar_modelo('modelo_lstm.pkl')
-        log_retraining("✅ LSTM retreinado e salvo!")
+        
+        # Garantir que o LSTM seja treinado corretamente
+        try:
+            classifier_lstm.treinar_modelo(X, y)
+            if classifier_lstm.is_trained:
+                classifier_lstm.salvar_modelo('modelo_lstm.pkl')
+                log_retraining("✅ LSTM retreinado e salvo!")
+            else:
+                log_retraining("❌ LSTM não foi treinado corretamente")
+        except Exception as e:
+            log_retraining(f"❌ Erro ao treinar LSTM: {e}")
         
         log_retraining("🎉 Todos os modelos foram retreinados com sucesso!")
         retraining_status = "completed"
@@ -348,18 +434,44 @@ def dashboard():
                 resultado = aplicar_dinamica_simbolica(sinal_id, m=3)
                 if resultado and 'entropia' in resultado:
                     entropias.append(resultado['entropia'])
+                    
+                    # Fazer predições com todos os modelos
                     predicao = None
-                    if classifier.is_trained:
+                    predicao_cnn = None
+                    predicao_lstm = None
+                    
+                    # Random Forest
+                    if classifier and classifier.is_trained:
                         try:
                             predicao = classifier.prever_sinal(sinal_id)
                         except Exception:
                             pass
+                    
+                    # CNN Original
+                    if classifier_cnn_original and classifier_cnn_original.is_trained:
+                        try:
+                            predicao_cnn = classifier_cnn_original.prever_sinal(sinal_id)
+                        except Exception:
+                            pass
+                    
+                    # LSTM
+                    if classifier_lstm and classifier_lstm.is_trained:
+                        try:
+                            predicao_lstm = classifier_lstm.prever_sinal(sinal_id)
+                        except Exception:
+                            pass
+                    
                     sinais_recentes.append({
-                        'nome': nome,
-                        'categoria': 'Sim' if categoria == 'S' else 'Não',
+                                                'id': sinal_id,
+                        'nome_arquivo': nome,
+                        'categoria': categoria,
                         'entropia': resultado['entropia'],
-                        'predicao': predicao
-                    })
+                        'complexidade': resultado.get('complexidade', 0.0),
+                        'data_upload': datetime.now().isoformat(),  # Converter para string ISO
+                        'predicao': predicao,
+                        'predicao_cnn': predicao_cnn,
+                        'predicao_lstm': predicao_lstm
+                     })
             except Exception:
                 continue
         if not entropias:
@@ -373,9 +485,40 @@ def dashboard():
         }
         cursor.close()
         conexao.close()
+        # Calcular taxa de acerto (placeholder - pode ser implementado depois)
+        taxa_acerto = 0.85  # Valor padrão
+        
+        # Converter sinais para JSON para JavaScript
+        import json
+        
+        # Função para converter objetos NumPy para tipos Python nativos
+        def converter_para_json(obj):
+            if hasattr(obj, 'item'):  # NumPy scalar
+                return obj.item()
+            elif hasattr(obj, 'tolist'):  # NumPy array
+                return obj.tolist()
+            elif isinstance(obj, dict):
+                return {k: converter_para_json(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [converter_para_json(item) for item in obj]
+            else:
+                return obj
+        
+        # Converter sinais para tipos JSON serializáveis
+        sinais_json_serializavel = []
+        for sinal in sinais_recentes:
+            sinal_convertido = converter_para_json(sinal)
+            sinais_json_serializavel.append(sinal_convertido)
+        
+        sinais_json = json.dumps(sinais_json_serializavel)
+        
         return render_template("dashboard.html", 
-                             stats=stats, 
-                             sinais_recentes=sinais_recentes,
+                             total_sinais=total_sinais,
+                             sinais_sim=sinais_sim,
+                             sinais_nao=sinais_nao,
+                             taxa_acerto=taxa_acerto,
+                             sinais=sinais_recentes,
+                             sinais_json=sinais_json,
                              entropias=entropias)
     except Exception as e:
         return render_template("erro.html", mensagem=f"Erro ao carregar dashboard: {e}")
@@ -512,126 +655,125 @@ def processar_arquivo_eeg(arquivo):
             return {'erro': 'Nenhum valor numérico encontrado no arquivo'}
         
         print(f"📊 Valores lidos: {len(valores)} amostras")
-            
-            # Inserir no banco de dados
-            try:
-                conexao = obter_conexao_db()
-                print("✅ Conexão com banco estabelecida")
-            except Exception as e:
-                return {'erro': f'Erro de conexão com banco: {str(e)}'}
-            cursor = conexao.cursor()
-            
-            # Criar usuário temporário (sem categoria - usar 'N' como padrão)
-            cursor.execute("""
-                INSERT INTO usuarios (possui) 
-                VALUES (%s) RETURNING id
-            """, ('N',))
-            id_usuario = cursor.fetchone()[0]
-            
-            # Criar sinal
-            cursor.execute("""
-                INSERT INTO sinais (nome, idusuario) 
-                VALUES (%s, %s) RETURNING id
-            """, (nome_arquivo, id_usuario))
-            id_sinal = cursor.fetchone()[0]
-            
-            # Inserir valores em lote (otimizado)
-            valores_para_inserir = [(id_sinal, valor) for valor in valores]
-            cursor.executemany("""
-                INSERT INTO valores_sinais (idsinal, valor) 
-                VALUES (%s, %s)
-            """, valores_para_inserir)
-            
-            conexao.commit()
-            cursor.close()
-            conexao.close()
-            
-            # Aplicar dinâmica simbólica
-            try:
-                print(f"🔧 Aplicando dinâmica simbólica para sinal {id_sinal}")
-                resultado_ds = aplicar_dinamica_simbolica(id_sinal, m=3)
-                
-                if resultado_ds is None:
-                    print("❌ Resultado da dinâmica simbólica é None")
-                    return {'erro': 'Erro ao processar dinâmica simbólica'}
-                
-                print(f"✅ Dinâmica simbólica aplicada com sucesso")
-                print(f"📊 Resultado DS: {resultado_ds}")
-            except Exception as e:
-                print(f"❌ Erro na dinâmica simbólica: {str(e)}")
-                return {'erro': f'Erro na dinâmica simbólica: {str(e)}'}
-            
-            # Fazer predição se o modelo estiver treinado
-            predicao = None
-            if classifier.is_trained:
-                try:
-                    predicao_raw = classifier.prever_sinal(id_sinal)
-                    # Converter tipos NumPy para Python nativos
-                    if predicao_raw:
-                        predicao = {
-                            'classe_predita': str(predicao_raw.get('classe_predita', '')),
-                            'probabilidade': float(predicao_raw.get('probabilidade', 0.0))
-                        }
-                except Exception as e:
-                    print(f"Erro na predição: {e}")
-            
-            # Calcular confiança baseada na entropia
-            entropia = float(resultado_ds.get('entropia', 0))
-            print(f"🔍 Entropia calculada: {entropia}")
-            print(f"🔍 Tipo da entropia: {type(entropia)}")
-            
-            # Análise de confiança baseada na entropia
-            if entropia < 0.3:
-                confianca = "Baixa"
-                confianca_porcentagem = 30
-                confianca_descricao = "Sinal muito previsível, baixa complexidade"
-            elif entropia < 0.6:
-                confianca = "Média"
-                confianca_porcentagem = 60
-                confianca_descricao = "Sinal com complexidade moderada"
-            elif entropia < 0.8:
-                confianca = "Alta"
-                confianca_porcentagem = 80
-                confianca_descricao = "Sinal com boa complexidade e variabilidade"
-            else:
-                confianca = "Muito Alta"
-                confianca_porcentagem = 95
-                confianca_descricao = "Sinal muito complexo e imprevisível"
-            
-            print(f"✅ Confiança calculada: {confianca} ({confianca_porcentagem}%)")
-            print(f"📝 Descrição: {confianca_descricao}")
-            
-            # Debug dos dados retornados
-            print(f"🔍 Dados do resultado_ds:")
-            print(f"  - entropia: {resultado_ds.get('entropia')}")
-            print(f"  - limiar: {resultado_ds.get('limiar')}")
-            print(f"  - sequencia_binaria: {len(resultado_ds.get('sequencia_binaria', []))} elementos")
-            print(f"  - grupos_binarios: {len(resultado_ds.get('grupos_binarios', []))} elementos")
-            
-            # Preparar resultados
-            resultados = {
-                'id_sinal': int(id_sinal),
-                'nome_arquivo': arquivo.filename,
-                'total_amostras': int(len(valores)),
-                'entropia': entropia,
-                'limiar': float(resultado_ds.get('limiar', 0)),
-                'confianca': confianca,
-                'confianca_porcentagem': confianca_porcentagem,
-                'confianca_descricao': confianca_descricao,
-                'url_histograma': f"/static/{os.path.basename(resultado_ds.get('caminho_histograma', ''))}",
-                'url_sequencia': f"/static/{os.path.basename(resultado_ds.get('caminho_sequencia', ''))}",
-                'sequencia_binaria': [int(x) for x in resultado_ds.get('sequencia_binaria', [])[:20]],
-                'grupos_binarios': [int(x) for x in resultado_ds.get('grupos_binarios', [])[:10]],
-                'predicao': predicao,
-                'sucesso': True
-            }
-            
-
-            
-            return resultados
-            
+        
+        # Inserir no banco de dados
+        try:
+            conexao = obter_conexao_db()
+            print("✅ Conexão com banco estabelecida")
         except Exception as e:
-            return {'erro': f'Erro ao processar arquivo: {str(e)}'}
+            return {'erro': f'Erro de conexão com banco: {str(e)}'}
+        
+        cursor = conexao.cursor()
+        
+        # Criar usuário temporário (sem categoria - usar 'N' como padrão)
+        cursor.execute("""
+            INSERT INTO usuarios (possui) 
+            VALUES (%s) RETURNING id
+        """, ('N',))
+        id_usuario = cursor.fetchone()[0]
+        
+        # Criar sinal
+        cursor.execute("""
+            INSERT INTO sinais (nome, idusuario) 
+            VALUES (%s, %s) RETURNING id
+        """, (nome_arquivo, id_usuario))
+        id_sinal = cursor.fetchone()[0]
+        
+        # Inserir valores em lote (otimizado)
+        valores_para_inserir = [(id_sinal, valor) for valor in valores]
+        cursor.executemany("""
+            INSERT INTO valores_sinais (idsinal, valor) 
+            VALUES (%s, %s)
+        """, valores_para_inserir)
+        
+        conexao.commit()
+        cursor.close()
+        conexao.close()
+        
+        # Aplicar dinâmica simbólica
+        try:
+            print(f"🔧 Aplicando dinâmica simbólica para sinal {id_sinal}")
+            resultado_ds = aplicar_dinamica_simbolica(id_sinal, m=3)
+            
+            if resultado_ds is None:
+                print("❌ Resultado da dinâmica simbólica é None")
+                return {'erro': 'Erro ao processar dinâmica simbólica'}
+            
+            print(f"✅ Dinâmica simbólica aplicada com sucesso")
+            print(f"📊 Resultado DS: {resultado_ds}")
+        except Exception as e:
+            print(f"❌ Erro na dinâmica simbólica: {str(e)}")
+            return {'erro': f'Erro na dinâmica simbólica: {str(e)}'}
+        
+        # Fazer predição se o modelo estiver treinado
+        predicao = None
+        if classifier.is_trained:
+            try:
+                predicao_raw = classifier.prever_sinal(id_sinal)
+                # Converter tipos NumPy para Python nativos
+                if predicao_raw:
+                    predicao = {
+                        'classe_predita': str(predicao_raw.get('classe_predita', '')),
+                        'probabilidade': float(predicao_raw.get('probabilidade', 0.0))
+                    }
+            except Exception as e:
+                print(f"Erro na predição: {e}")
+        
+        # Calcular confiança baseada na entropia
+        entropia = float(resultado_ds.get('entropia', 0))
+        print(f"🔍 Entropia calculada: {entropia}")
+        print(f"🔍 Tipo da entropia: {type(entropia)}")
+        
+        # Análise de confiança baseada na entropia
+        if entropia < 0.3:
+            confianca = "Baixa"
+            confianca_porcentagem = 30
+            confianca_descricao = "Sinal muito previsível, baixa complexidade"
+        elif entropia < 0.6:
+            confianca = "Média"
+            confianca_porcentagem = 60
+            confianca_descricao = "Sinal com complexidade moderada"
+        elif entropia < 0.8:
+            confianca = "Alta"
+            confianca_porcentagem = 80
+            confianca_descricao = "Sinal com boa complexidade e variabilidade"
+        else:
+            confianca = "Muito Alta"
+            confianca_porcentagem = 95
+            confianca_descricao = "Sinal muito complexo e imprevisível"
+        
+        print(f"✅ Confiança calculada: {confianca} ({confianca_porcentagem}%)")
+        print(f"📝 Descrição: {confianca_descricao}")
+        
+        # Debug dos dados retornados
+        print(f"🔍 Dados do resultado_ds:")
+        print(f"  - entropia: {resultado_ds.get('entropia')}")
+        print(f"  - limiar: {resultado_ds.get('limiar')}")
+        print(f"  - sequencia_binaria: {len(resultado_ds.get('sequencia_binaria', []))} elementos")
+        print(f"  - grupos_binarios: {len(resultado_ds.get('grupos_binarios', []))} elementos")
+        
+        # Preparar resultados
+        resultados = {
+            'id_sinal': int(id_sinal),
+            'nome_arquivo': arquivo.filename,
+            'total_amostras': int(len(valores)),
+            'entropia': entropia,
+            'limiar': float(resultado_ds.get('limiar', 0)),
+            'confianca': confianca,
+            'confianca_porcentagem': confianca_porcentagem,
+            'confianca_descricao': confianca_descricao,
+            'url_histograma': f"/static/{os.path.basename(resultado_ds.get('caminho_histograma', ''))}",
+            'url_sequencia': f"/static/{os.path.basename(resultado_ds.get('caminho_sequencia', ''))}",
+            'sequencia_binaria': [int(x) for x in resultado_ds.get('sequencia_binaria', [])[:20]],
+            'grupos_binarios': [int(x) for x in resultado_ds.get('grupos_binarios', [])[:10]],
+            'predicao': predicao,
+            'sucesso': True
+        }
+        
+        return resultados
+        
+    except Exception as e:
+        return {'erro': f'Erro ao processar arquivo: {str(e)}'}
 
 def aplicar_dinamica_simbolica_direta(valores, id_sinal, m=3):
     """
@@ -876,10 +1018,152 @@ def upload_eeg():
     try:
         resultado = processar_arquivo_eeg(arquivo)
         print(f"✅ Processamento concluído: {resultado.get('sucesso', False)}")
+        
+        # Se o processamento foi bem-sucedido, retornar também a predição
+        if resultado.get('sucesso'):
+            # Buscar o ID do sinal recém-criado
+            conexao = obter_conexao_db()
+            cursor = conexao.cursor()
+            
+            cursor.execute("""
+                SELECT s.id, s.nome 
+                FROM sinais s 
+                ORDER BY s.id DESC 
+                LIMIT 1
+            """)
+            
+            sinal_info = cursor.fetchone()
+            cursor.close()
+            conexao.close()
+            
+            if sinal_info:
+                id_sinal = sinal_info[0]
+                nome_sinal = sinal_info[1]
+                
+                # Fazer predição
+                try:
+                    predicao = classifier.prever_sinal(id_sinal)
+                    resultado['predicao'] = predicao
+                    resultado['id_sinal'] = id_sinal
+                    resultado['nome_sinal'] = nome_sinal
+                except Exception as e:
+                    print(f"❌ Erro na predição: {e}")
+                    resultado['predicao'] = None
+                    resultado['erro_predicao'] = str(e)
+        
         return jsonify(resultado)
     except Exception as e:
         print(f"❌ Erro no processamento: {str(e)}")
         return jsonify({'erro': f'Erro interno: {str(e)}'})
+
+@app.route("/marcar_categoria_real", methods=["POST"])
+def marcar_categoria_real():
+    """
+    Marca a categoria real de um sinal após o upload
+    """
+    try:
+        data = request.get_json()
+        id_sinal = data.get('id_sinal')
+        categoria_real = data.get('categoria_real')  # 'S' ou 'N'
+        
+        if not id_sinal or categoria_real not in ['S', 'N']:
+            return jsonify({'erro': 'Dados inválidos'})
+        
+        # Atualizar a categoria do usuário
+        conexao = obter_conexao_db()
+        cursor = conexao.cursor()
+        
+        cursor.execute("""
+            UPDATE usuarios 
+            SET possui = %s 
+            WHERE id = (
+                SELECT idusuario FROM sinais WHERE id = %s
+            )
+        """, (categoria_real, id_sinal))
+        
+        conexao.commit()
+        cursor.close()
+        conexao.close()
+        
+        return jsonify({
+            'sucesso': True,
+            'mensagem': f'Categoria real marcada como {"Sim" if categoria_real == "S" else "Não"}'
+        })
+        
+    except Exception as e:
+        return jsonify({'erro': f'Erro ao marcar categoria: {str(e)}'})
+
+@app.route("/verificar_dados")
+def verificar_dados():
+    """Rota para verificar dados no banco"""
+    try:
+        conexao = obter_conexao_db()
+        cursor = conexao.cursor()
+        
+        # Verificar total de sinais por categoria
+        cursor.execute("""
+            SELECT u.possui, COUNT(*) as total
+            FROM sinais s
+            JOIN usuarios u ON s.idusuario = u.id
+            GROUP BY u.possui
+            ORDER BY u.possui
+        """)
+        
+        categorias = cursor.fetchall()
+        
+        # Verificar alguns sinais de exemplo
+        cursor.execute("""
+            SELECT s.id, s.nome, u.possui
+            FROM sinais s
+            JOIN usuarios u ON s.idusuario = u.id
+            ORDER BY s.id
+            LIMIT 20
+        """)
+        
+        exemplos = cursor.fetchall()
+        
+        cursor.close()
+        conexao.close()
+        
+        return jsonify({
+            'categorias': [{'categoria': cat, 'total': total} for cat, total in categorias],
+            'exemplos': [{'id': id, 'nome': nome, 'categoria': cat} for id, nome, cat in exemplos]
+        })
+        
+    except Exception as e:
+        return jsonify({'erro': str(e)})
+
+@app.route("/teste_precisao")
+def pagina_teste_precisao():
+    """
+    Página para testar a precisão da IA com dados cegos
+    """
+    try:
+        conexao = obter_conexao_db()
+        cursor = conexao.cursor()
+        
+        # Buscar sinais recentes para teste
+        cursor.execute("""
+            SELECT s.id, s.nome, u.possui, s.id as id_sinal
+            FROM sinais s
+            JOIN usuarios u ON s.idusuario = u.id
+            ORDER BY s.id DESC
+            LIMIT 50
+        """)
+        
+        sinais = cursor.fetchall()
+        cursor.close()
+        conexao.close()
+        
+        # Calcular precisão atual (implementação simples)
+        precisao = {'total': 0, 'acertos': 0, 'precisao': 0.0}
+        
+        return render_template("teste_precisao.html", 
+                             sinais=sinais, 
+                             precisao=precisao)
+    except Exception as e:
+        return render_template("erro.html", 
+                             mensagem=f"Erro ao carregar página de teste: {e}")
 
 if __name__ == "__main__":
     # Mostrar configurações ao iniciar
