@@ -244,9 +244,14 @@
                 Faça upload de arquivos EEG na página de Upload e depois volte aqui para testar a precisão da IA.
             </p>
         </div>
-        <button onclick="carregarPredicoes()" style="padding: 0.5rem 1rem; background: var(--primary-color); color: white; border: none; border-radius: 0.25rem; cursor: pointer;">
-            🔄 Carregar Predições
-        </button>
+                 <div style="display: flex; gap: 1rem; align-items: center;">
+             <button onclick="carregarPredicoes()" id="btn-carregar" style="padding: 0.5rem 1rem; background: var(--primary-color); color: white; border: none; border-radius: 0.25rem; cursor: pointer;">
+                 🔄 Carregar Predições
+             </button>
+             <div id="progresso-info" style="display: none; color: var(--gray-600); font-size: 0.9rem;">
+                 Processando sinais...
+             </div>
+         </div>
     </div>
     
     {% if sinais %}
@@ -310,12 +315,20 @@ async function fazerPredicao(sinalId) {
         predicaoElement.className = 'predicao-value predicao-loading';
         
         const response = await fetch(`/predicao_sinal/${sinalId}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const data = await response.json();
         
         if (data.sucesso && data.predicao) {
             const predicao = data.predicao;
             const classe = predicao.classe_predita;
             const probabilidade = predicao.probabilidade;
+            
+            // Debug: mostrar predição recebida
+            console.log(`Predição recebida para sinal ${sinalId}:`, predicao);
             
             // Armazenar predição
             predicoes[sinalId] = predicao;
@@ -334,16 +347,26 @@ async function fazerPredicao(sinalId) {
             }
             
         } else {
-            predicaoElement.textContent = '❌ Erro na predição';
+            // Mostrar erro específico
+            const erroMsg = data.erro || 'Erro desconhecido';
+            predicaoElement.textContent = `❌ ${erroMsg}`;
             predicaoElement.className = 'predicao-value predicao-erro';
             probabilidadeElement.textContent = '';
+            
+            // Se o erro for sobre modelo não treinado, mostrar instrução
+            if (erroMsg.includes('não está treinado')) {
+                probabilidadeElement.textContent = 'Clique em "Retreinar" na página inicial para treinar o modelo';
+            }
         }
         
     } catch (error) {
-        console.error('Erro ao fazer predição:', error);
-        predicaoElement.textContent = '❌ Erro na predição';
+        console.error(`Erro ao fazer predição para sinal ${sinalId}:`, error);
+        predicaoElement.textContent = '❌ Erro de conexão';
         predicaoElement.className = 'predicao-value predicao-erro';
-        probabilidadeElement.textContent = '';
+        probabilidadeElement.textContent = 'Verifique sua conexão e tente novamente';
+        
+        // Re-throw para que o erro seja capturado pela função chamadora
+        throw error;
     }
 }
 
@@ -422,7 +445,22 @@ function verificarResultado(sinalId) {
     
     if (predicao && categoriaReal) {
         const classePredita = predicao.classe_predita;
-        const acerto = (classePredita === categoriaReal);
+        
+        // Normalizar valores para comparação
+        const classeNormalizada = classePredita === 'Sim' ? 'S' : classePredita === 'Não' ? 'N' : classePredita;
+        const categoriaNormalizada = categoriaReal;
+        
+        const acerto = (classeNormalizada === categoriaNormalizada);
+        
+        // Debug: mostrar valores para verificar
+        console.log(`Sinal ${sinalId}:`, {
+            predicao: predicao,
+            classePredita: classePredita,
+            classeNormalizada: classeNormalizada,
+            categoriaReal: categoriaReal,
+            categoriaNormalizada: categoriaNormalizada,
+            acerto: acerto
+        });
         
         if (acerto) {
             resultadoElement.innerHTML = '<div class="resultado-acerto">✅ Acerto! IA previu corretamente</div>';
@@ -454,22 +492,71 @@ async function atualizarEstatisticas() {
 async function carregarPredicoes() {
     const sinais = document.querySelectorAll('.sinal-card');
     
-    // Carregar apenas os primeiros 10 sinais para evitar sobrecarga
-    const sinaisLimitados = Array.from(sinais).slice(0, 10);
+    // Mostrar loading no botão e indicador de progresso
+    const botao = document.getElementById('btn-carregar');
+    const progressoInfo = document.getElementById('progresso-info');
+    const textoOriginal = botao.textContent;
     
-    for (const sinal of sinaisLimitados) {
-        const sinalId = sinal.dataset.sinalId;
-        await fazerPredicao(sinalId);
+    botao.textContent = '⏳ Processando...';
+    botao.disabled = true;
+    progressoInfo.style.display = 'block';
+    
+    try {
+        // Processar todos os sinais, mas com controle de progresso
+        const totalSinais = sinais.length;
+        let processados = 0;
+        let sucessos = 0;
+        let erros = 0;
         
-        // Delay maior para não sobrecarregar o servidor
-        await new Promise(resolve => setTimeout(resolve, 200));
+        for (const sinal of sinais) {
+            const sinalId = sinal.dataset.sinalId;
+            
+            // Atualizar progresso
+            processados++;
+            progressoInfo.textContent = `Processando sinal ${processados} de ${totalSinais}...`;
+            
+            try {
+                await fazerPredicao(sinalId);
+                sucessos++;
+                
+                // Delay entre predições para não sobrecarregar
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+            } catch (error) {
+                console.error(`Erro ao processar sinal ${sinalId}:`, error);
+                erros++;
+                // Continuar com o próximo sinal mesmo se houver erro
+            }
+        }
+        
+        // Mostrar resultado final
+        botao.textContent = '✅ Concluído!';
+        progressoInfo.textContent = `Processamento concluído: ${sucessos} sucessos, ${erros} erros`;
+        
+        setTimeout(() => {
+            botao.textContent = textoOriginal;
+            botao.disabled = false;
+            progressoInfo.style.display = 'none';
+        }, 3000);
+        
+    } catch (error) {
+        console.error('Erro geral ao carregar predições:', error);
+        botao.textContent = '❌ Erro';
+        progressoInfo.textContent = 'Erro no processamento';
+        
+        setTimeout(() => {
+            botao.textContent = textoOriginal;
+            botao.disabled = false;
+            progressoInfo.style.display = 'none';
+        }, 3000);
     }
 }
 
 // Inicializar quando a página carregar
 document.addEventListener('DOMContentLoaded', function() {
-    // Atualizar estatísticas a cada 30 segundos
-    setInterval(atualizarEstatisticas, 30000);
+    // Não atualizar estatísticas automaticamente para evitar loops
+    // As estatísticas serão atualizadas apenas quando o usuário marcar categorias
+    console.log('Página de teste de precisão carregada');
 });
 </script>
 {% endblock %}

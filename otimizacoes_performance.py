@@ -1,252 +1,253 @@
 #!/usr/bin/env python3
 """
-Script com otimizações de performance para o projeto EEG
+Script de otimizações de performance para o sistema EEG
 """
 
 import os
 import sys
+import psycopg2
 import pickle
-import numpy as np
-from pathlib import Path
+from datetime import datetime
+from config import config
 
-def criar_cache_predicoes():
-    """Cria cache de predições para todos os sinais"""
-    print("🚀 Criando cache de predições...")
-    
-    try:
-        from app import obter_conexao_db, classifier, classifier_cnn, classifier_cnn_original, classifier_lstm
-        
-        conexao = obter_conexao_db()
-        cursor = conexao.cursor()
-        
-        # Buscar todos os sinais
-        cursor.execute("SELECT id, nome FROM sinais ORDER BY id")
-        todos_sinais = cursor.fetchall()
-        cursor.close()
-        conexao.close()
-        
-        cache_predicoes = {}
-        total_sinais = len(todos_sinais)
-        
-        print(f"📊 Processando {total_sinais} sinais...")
-        
-        for i, (sinal_id, nome) in enumerate(todos_sinais, 1):
-            if i % 10 == 0:
-                print(f"📈 Progresso: {i}/{total_sinais} ({i/total_sinais*100:.1f}%)")
-            
-            predicoes_sinal = {}
-            
-            # Random Forest
-            try:
-                if classifier and classifier.is_trained:
-                    predicao = classifier.prever_sinal(sinal_id)
-                    predicoes_sinal['random_forest'] = predicao
-            except Exception as e:
-                print(f"❌ Erro RF sinal {nome}: {e}")
-            
-            # MLP Tabular
-            try:
-                if classifier_cnn and classifier_cnn.is_trained:
-                    predicao = classifier_cnn.prever_sinal(sinal_id)
-                    predicoes_sinal['mlp_tabular'] = predicao
-            except Exception as e:
-                print(f"❌ Erro MLP sinal {nome}: {e}")
-            
-            # CNN Original
-            try:
-                if classifier_cnn_original and classifier_cnn_original.is_trained:
-                    predicao = classifier_cnn_original.prever_sinal(sinal_id)
-                    predicoes_sinal['cnn_original'] = predicao
-            except Exception as e:
-                print(f"❌ Erro CNN sinal {nome}: {e}")
-            
-            # LSTM
-            try:
-                if classifier_lstm and classifier_lstm.is_trained:
-                    predicao = classifier_lstm.prever_sinal(sinal_id)
-                    predicoes_sinal['lstm'] = predicao
-            except Exception as e:
-                print(f"❌ Erro LSTM sinal {nome}: {e}")
-            
-            cache_predicoes[sinal_id] = predicoes_sinal
-        
-        # Salvar cache
-        with open('cache_predicoes.pkl', 'wb') as f:
-            pickle.dump(cache_predicoes, f)
-        
-        print(f"✅ Cache salvo com {len(cache_predicoes)} sinais")
-        return cache_predicoes
-        
-    except Exception as e:
-        print(f"❌ Erro ao criar cache: {e}")
-        return None
-
-def otimizar_banco_dados():
-    """Otimiza o banco de dados com índices"""
-    print("🔧 Otimizando banco de dados...")
-    
-    try:
-        from app import obter_conexao_db
-        
-        conexao = obter_conexao_db()
-        cursor = conexao.cursor()
-        
-        # Criar índices para melhorar performance
-        indices = [
-            "CREATE INDEX IF NOT EXISTS idx_sinais_id ON sinais(id)",
-            "CREATE INDEX IF NOT EXISTS idx_sinais_nome ON sinais(nome)",
-            "CREATE INDEX IF NOT EXISTS idx_valores_sinais_idsinal ON valores_sinais(idsinal)",
-            "CREATE INDEX IF NOT EXISTS idx_predicoes_ia_id_sinal ON predicoes_ia(id_sinal)",
-            "CREATE INDEX IF NOT EXISTS idx_predicoes_ia_tipo_modelo ON predicoes_ia(tipo_modelo)",
-            "CREATE INDEX IF NOT EXISTS idx_usuarios_possui ON usuarios(possui)"
-        ]
-        
-        for indice in indices:
-            try:
-                cursor.execute(indice)
-                print(f"✅ Índice criado")
-            except Exception as e:
-                print(f"⚠️ Índice já existe ou erro: {e}")
-        
-        conexao.commit()
-        cursor.close()
-        conexao.close()
-        
-        print("✅ Banco de dados otimizado!")
-        
-    except Exception as e:
-        print(f"❌ Erro ao otimizar banco: {e}")
+def obter_conexao_db():
+    """Conecta ao banco de dados PostgreSQL"""
+    return psycopg2.connect(**config.get_db_connection_string())
 
 def limpar_cache_antigo():
     """Remove arquivos de cache antigos"""
     print("🧹 Limpando cache antigo...")
     
-    arquivos_cache = [
-        'static/graph_cache_*.html',
+    cache_files = [
         'cache_predicoes.pkl',
-        '*.pyc',
-        '__pycache__'
+        'static/graph_cache_*.html'
     ]
     
-    for padrao in arquivos_cache:
-        try:
-            if '*' in padrao:
-                import glob
-                arquivos = glob.glob(padrao)
-                for arquivo in arquivos:
-                    if os.path.isfile(arquivo):
-                        os.remove(arquivo)
-                        print(f"🗑️ Removido: {arquivo}")
-            else:
-                if os.path.exists(padrao):
-                    if os.path.isfile(padrao):
-                        os.remove(padrao)
-                    elif os.path.isdir(padrao):
-                        import shutil
-                        shutil.rmtree(padrao)
-                    print(f"🗑️ Removido: {padrao}")
-        except Exception as e:
-            print(f"⚠️ Erro ao remover {padrao}: {e}")
-    
-    print("✅ Cache limpo!")
+    for pattern in cache_files:
+        if '*' in pattern:
+            import glob
+            files = glob.glob(pattern)
+            for file in files:
+                try:
+                    os.remove(file)
+                    print(f"   ✅ Removido: {file}")
+                except:
+                    pass
+        else:
+            try:
+                if os.path.exists(pattern):
+                    os.remove(pattern)
+                    print(f"   ✅ Removido: {pattern}")
+            except:
+                pass
 
-def configurar_matplotlib_otimizado():
-    """Configura Matplotlib para melhor performance"""
-    print("📊 Configurando Matplotlib otimizado...")
+def criar_indices_banco():
+    """Cria índices no banco para melhorar performance"""
+    print("📊 Criando índices no banco de dados...")
+    
+    indices = [
+        "CREATE INDEX IF NOT EXISTS idx_valores_sinais_idsinal ON valores_sinais(idsinal)",
+        "CREATE INDEX IF NOT EXISTS idx_sinais_idusuario ON sinais(idusuario)",
+        "CREATE INDEX IF NOT EXISTS idx_usuarios_possui ON usuarios(possui)",
+        "CREATE INDEX IF NOT EXISTS idx_predicoes_ia_id_sinal ON predicoes_ia(id_sinal)",
+        "CREATE INDEX IF NOT EXISTS idx_predicoes_ia_tipo_modelo ON predicoes_ia(tipo_modelo)"
+    ]
     
     try:
-        import matplotlib
-        matplotlib.use('Agg')  # Backend não-interativo
-        matplotlib.rcParams['figure.dpi'] = 100
-        matplotlib.rcParams['savefig.bbox'] = 'tight'
-        matplotlib.rcParams['figure.max_open_warning'] = 0
-        matplotlib.rcParams['savefig.format'] = 'png'
-        matplotlib.rcParams['savefig.transparent'] = False
+        conexao = obter_conexao_db()
+        cursor = conexao.cursor()
         
-        print("✅ Matplotlib configurado para performance!")
+        for indice in indices:
+            try:
+                cursor.execute(indice)
+                print(f"   ✅ Índice criado")
+            except Exception as e:
+                print(f"   ⚠️ Erro ao criar índice: {e}")
+        
+        conexao.commit()
+        cursor.close()
+        conexao.close()
+        print("✅ Índices criados com sucesso!")
         
     except Exception as e:
-        print(f"❌ Erro ao configurar Matplotlib: {e}")
+        print(f"❌ Erro ao criar índices: {e}")
 
-def criar_script_inicializacao_rapida():
-    """Cria script para inicialização rápida"""
-    print("⚡ Criando script de inicialização rápida...")
+def configurar_matplotlib():
+    """Configura Matplotlib para melhor performance"""
+    print("🎨 Configurando Matplotlib para performance...")
     
-    script_content = '''#!/usr/bin/env python3
-"""
-Script de inicialização rápida com otimizações
-"""
+    config_matplotlib = """
+# Configurações de performance para Matplotlib
+import matplotlib
+matplotlib.use('Agg')  # Backend não interativo
+matplotlib.rcParams['figure.max_open_warning'] = 0
+matplotlib.rcParams['figure.dpi'] = 100
+matplotlib.rcParams['savefig.dpi'] = 100
+matplotlib.rcParams['savefig.bbox'] = 'tight'
+matplotlib.rcParams['savefig.pad_inches'] = 0.1
+matplotlib.rcParams['figure.figsize'] = [8, 6]
+matplotlib.rcParams['font.size'] = 10
 
+import matplotlib.pyplot as plt
+plt.ioff()  # Desabilitar modo interativo
+
+# Suprimir avisos
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib')
+"""
+    
+    # Salvar configuração em arquivo
+    with open('matplotlib_config.py', 'w') as f:
+        f.write(config_matplotlib)
+    
+    print("✅ Configuração do Matplotlib salva!")
+
+def criar_cache_predicoes():
+    """Cria cache inicial de predições"""
+    print("💾 Criando cache de predições...")
+    
+    try:
+        from app import classifier, obter_conexao_db
+        
+        if not classifier or not classifier.is_trained:
+            print("   ⚠️ Modelo não treinado, pulando cache de predições")
+            return
+        
+        conexao = obter_conexao_db()
+        cursor = conexao.cursor()
+        
+        # Buscar todos os sinais
+        cursor.execute("SELECT id FROM sinais ORDER BY id")
+        sinais = cursor.fetchall()
+        
+        cache = {}
+        total = len(sinais)
+        
+        print(f"   📊 Processando {total} sinais...")
+        
+        for i, (sinal_id,) in enumerate(sinais, 1):
+            try:
+                if i % 10 == 0:
+                    print(f"   📈 Progresso: {i}/{total} ({i/total*100:.1f}%)")
+                
+                predicao = classifier.prever_sinal(sinal_id)
+                if predicao:
+                    cache[sinal_id] = predicao
+                    
+            except Exception as e:
+                print(f"   ⚠️ Erro no sinal {sinal_id}: {e}")
+                continue
+        
+        # Salvar cache
+        with open('cache_predicoes.pkl', 'wb') as f:
+            pickle.dump(cache, f)
+        
+        print(f"✅ Cache criado com {len(cache)} predições!")
+        
+        cursor.close()
+        conexao.close()
+        
+    except Exception as e:
+        print(f"❌ Erro ao criar cache: {e}")
+
+def configurar_variaveis_ambiente():
+    """Configura variáveis de ambiente para otimização"""
+    print("⚙️ Configurando variáveis de ambiente...")
+    
+    config_env = """
+# Configurações de performance
+export PYTHONOPTIMIZE=1
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+
+# Configurações do Flask
+export FLASK_ENV=production
+export FLASK_DEBUG=0
+"""
+    
+    # Salvar em arquivo .env
+    with open('.env_performance', 'w') as f:
+        f.write(config_env)
+    
+    print("✅ Variáveis de ambiente configuradas!")
+
+def criar_script_inicio_rapido():
+    """Cria script para início rápido do sistema"""
+    print("🚀 Criando script de início rápido...")
+    
+    script = """#!/usr/bin/env python3
+# Script de início rápido com otimizações
 import os
 import sys
-import pickle
-from pathlib import Path
 
-# Configurar variáveis de ambiente para performance
+# Configurar variáveis de ambiente
 os.environ['PYTHONOPTIMIZE'] = '1'
-os.environ['OMP_NUM_THREADS'] = '4'  # Ajustar conforme CPU
-os.environ['MKL_NUM_THREADS'] = '4'
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
+os.environ['NUMEXPR_NUM_THREADS'] = '1'
 
 # Configurar Matplotlib
 import matplotlib
 matplotlib.use('Agg')
-matplotlib.rcParams['figure.dpi'] = 100
-matplotlib.rcParams['savefig.bbox'] = 'tight'
 matplotlib.rcParams['figure.max_open_warning'] = 0
 
-# Carregar cache de predições se existir
-cache_predicoes = None
-if os.path.exists('cache_predicoes.pkl'):
-    try:
-        with open('cache_predicoes.pkl', 'rb') as f:
-            cache_predicoes = pickle.load(f)
-        print(f"✅ Cache carregado: {len(cache_predicoes)} predições")
-    except Exception as e:
-        print(f"⚠️ Erro ao carregar cache: {e}")
-
-# Inicializar app
-from app import app, inicializar_classificador
+# Importar e executar app
+from app import app
 
 if __name__ == "__main__":
-    print("🚀 Inicializando servidor otimizado...")
-    inicializar_classificador()
-    app.run(debug=False, host='0.0.0.0', port=5000, threaded=True)
-'''
+    print("🚀 Iniciando sistema com otimizações...")
+    app.run(debug=False, host='0.0.0.0', port=5000)
+"""
     
-    with open('app_rapido.py', 'w', encoding='utf-8') as f:
-        f.write(script_content)
+    with open('inicio_rapido.py', 'w', encoding='utf-8') as f:
+        f.write(script)
     
-    print("✅ Script de inicialização rápida criado: app_rapido.py")
+    print("✅ Script de início rápido criado!")
 
 def main():
     """Executa todas as otimizações"""
-    print("🚀 Iniciando otimizações de performance...")
+    print("🔧 Iniciando otimizações de performance...")
+    print("=" * 50)
     
     # 1. Limpar cache antigo
     limpar_cache_antigo()
+    print()
     
-    # 2. Configurar Matplotlib
-    configurar_matplotlib_otimizado()
+    # 2. Criar índices no banco
+    criar_indices_banco()
+    print()
     
-    # 3. Otimizar banco de dados
-    otimizar_banco_dados()
+    # 3. Configurar Matplotlib
+    configurar_matplotlib()
+    print()
     
-    # 4. Criar cache de predições (opcional - demora mais)
-    print("\n🤔 Deseja criar cache de predições? (pode demorar alguns minutos)")
-    resposta = input("Digite 's' para sim ou Enter para pular: ").lower().strip()
+    # 4. Configurar variáveis de ambiente
+    configurar_variaveis_ambiente()
+    print()
     
-    if resposta == 's':
+    # 5. Criar script de início rápido
+    criar_script_inicio_rapido()
+    print()
+    
+    # 6. Criar cache de predições (opcional)
+    try:
         criar_cache_predicoes()
+    except:
+        print("⚠️ Cache de predições não criado (modelo não disponível)")
+    print()
     
-    # 5. Criar script de inicialização rápida
-    criar_script_inicializacao_rapida()
-    
-    print("\n🎉 Otimizações concluídas!")
-    print("\n📋 Como usar:")
-    print("1. Para inicialização rápida: python app_rapido.py")
-    print("2. Cache de predições será usado automaticamente")
-    print("3. Banco de dados otimizado com índices")
-    print("4. Matplotlib configurado para performance")
+    print("=" * 50)
+    print("✅ Todas as otimizações concluídas!")
+    print()
+    print("📋 Próximos passos:")
+    print("1. Use 'python inicio_rapido.py' para iniciar o sistema")
+    print("2. Ou configure as variáveis de ambiente em .env_performance")
+    print("3. O sistema agora deve carregar muito mais rápido!")
 
 if __name__ == "__main__":
     main()

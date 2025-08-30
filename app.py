@@ -38,6 +38,69 @@ classifier_cnn_original = None  # Modelo CNN original
 # Cache de predições para performance
 cache_predicoes = None
 
+# Sistema de gerenciamento de processos
+processos_ativos = {}
+processos_para_cancelar = set()
+lock_processos = threading.Lock()
+
+def cancelar_processos_desnecessarios():
+    """Cancela processos em background que não são necessários para a página atual"""
+    global processos_para_cancelar
+    
+    with lock_processos:
+        for processo_id in processos_para_cancelar:
+            if processo_id in processos_ativos:
+                print(f"🛑 Cancelando processo: {processo_id}")
+                processos_ativos[processo_id]['cancelar'] = True
+                processos_para_cancelar.remove(processo_id)
+
+def limpar_processos_finalizados():
+    """Remove processos que já foram finalizados"""
+    global processos_ativos
+    
+    with lock_processos:
+        processos_para_remover = []
+        for processo_id, info in processos_ativos.items():
+            if not info['thread'].is_alive():
+                processos_para_remover.append(processo_id)
+        
+        for processo_id in processos_para_remover:
+            del processos_ativos[processo_id]
+            print(f"🧹 Processo removido: {processo_id}")
+
+def registrar_processo(nome, thread, tipo="background"):
+    """Registra um novo processo ativo"""
+    global processos_ativos
+    
+    processo_id = f"{tipo}_{nome}_{int(time.time())}"
+    
+    with lock_processos:
+        processos_ativos[processo_id] = {
+            'nome': nome,
+            'thread': thread,
+            'tipo': tipo,
+            'inicio': time.time(),
+            'cancelar': False
+        }
+    
+    print(f"📝 Processo registrado: {processo_id}")
+    return processo_id
+
+def marcar_processo_para_cancelar(processo_id):
+    """Marca um processo para ser cancelado na próxima navegação"""
+    global processos_para_cancelar
+    
+    with lock_processos:
+        processos_para_cancelar.add(processo_id)
+        print(f"⚠️ Processo marcado para cancelamento: {processo_id}")
+
+def verificar_cancelamento(processo_id):
+    """Verifica se um processo deve ser cancelado"""
+    with lock_processos:
+        if processo_id in processos_ativos:
+            return processos_ativos[processo_id]['cancelar']
+    return False
+
 def obter_conexao_db():
     """Conecta ao banco de dados PostgreSQL."""
     return psycopg2.connect(**config.get_db_connection_string())
@@ -103,6 +166,16 @@ def inicializar_classificador():
 
 @app.route("/")
 def home():
+    # Limpar processos desnecessários ao navegar
+    cancelar_processos_desnecessarios()
+    limpar_processos_finalizados()
+    
+    # Marcar processos de predição para cancelamento (não são necessários na página inicial)
+    with lock_processos:
+        for processo_id, info in processos_ativos.items():
+            if info['tipo'] == 'predicao':
+                marcar_processo_para_cancelar(processo_id)
+    
     categoria = request.args.get("categoria")
     limite = request.args.get("limite", "50")  # Aumentar limite padrão para 50
     
@@ -186,8 +259,29 @@ def executar_retreinamento_background():
     retraining_status = "running"
     retraining_logs.clear()
     
+    # Obter ID do processo atual
+    processo_id = None
+    with lock_processos:
+        for pid, info in processos_ativos.items():
+            if info['nome'] == 'retreinamento' and info['thread'] == threading.current_thread():
+                processo_id = pid
+                break
+    
     try:
+        # Verificar cancelamento antes de começar
+        if processo_id and verificar_cancelamento(processo_id):
+            print("🛑 Retreinamento cancelado antes de iniciar")
+            retraining_status = "cancelled"
+            return
+        
         sucesso = inicializar_classificador()
+        
+        # Verificar cancelamento após inicialização
+        if processo_id and verificar_cancelamento(processo_id):
+            print("🛑 Retreinamento cancelado após inicialização")
+            retraining_status = "cancelled"
+            return
+        
         if sucesso:
             retraining_status = "completed"
         else:
@@ -204,10 +298,13 @@ def retreinar():
     if retraining_status == "running":
         return jsonify({"status": "running", "message": "Retreinamento já está em andamento"})
     
-    # Inicia o retreinamento em background
+    # Inicia o retreinamento em background com gerenciamento de processos
     thread = threading.Thread(target=executar_retreinamento_background)
     thread.daemon = True
     thread.start()
+    
+    # Registrar o processo
+    processo_id = registrar_processo("retreinamento", thread, "retreinamento")
     
     return jsonify({"status": "started", "message": "Retreinamento iniciado"})
 
@@ -223,6 +320,9 @@ def retreinar_todos():
     thread = threading.Thread(target=executar_retreinamento_todos_background)
     thread.daemon = True
     thread.start()
+    
+    # Registrar o processo
+    processo_id = registrar_processo("retreinamento_todos", thread, "retreinamento")
     
     return jsonify({"status": "started", "message": "Retreinamento de todos os modelos iniciado"})
 
@@ -362,10 +462,41 @@ def status_retreinamento():
         "logs": retraining_logs
     })
 
+@app.route("/status_processos")
+def status_processos():
+    """Rota para verificar o status de todos os processos ativos"""
+    global processos_ativos
+    
+    with lock_processos:
+        processos_info = []
+        for processo_id, info in processos_ativos.items():
+            processos_info.append({
+                'id': processo_id,
+                'nome': info['nome'],
+                'tipo': info['tipo'],
+                'ativo': info['thread'].is_alive(),
+                'tempo_ativo': time.time() - info['inicio'],
+                'cancelar': info['cancelar']
+            })
+    
+    return jsonify({
+        'processos': processos_info,
+        'total': len(processos_info)
+    })
+
 @app.route("/dashboard")
 def dashboard():
     """Dashboard com estatísticas gerais do sistema."""
     try:
+        # Limpar processos desnecessários ao navegar
+        cancelar_processos_desnecessarios()
+        limpar_processos_finalizados()
+        
+        # Marcar processos de predição para cancelamento
+        with lock_processos:
+            for processo_id, info in processos_ativos.items():
+                if info['tipo'] == 'predicao':
+                    marcar_processo_para_cancelar(processo_id)
         conexao = obter_conexao_db()
         cursor = conexao.cursor()
         cursor.execute("SELECT COUNT(*) FROM sinais")
@@ -1191,6 +1322,15 @@ def pagina_teste_precisao():
 def calcular_precisao_ia():
     """Calcula a precisão atual da IA baseada nos testes realizados"""
     try:
+        # Verificar se o classificador está treinado
+        if not classifier:
+            # Tentar inicializar o classificador se não existir
+            inicializar_classificador()
+            
+        if not classifier or not hasattr(classifier, 'is_trained') or not classifier.is_trained:
+            print("⚠️ Modelo não está treinado")
+            return {'total': 0, 'acertos': 0, 'precisao': 0.0}
+        
         conexao = obter_conexao_db()
         cursor = conexao.cursor()
         
@@ -1226,7 +1366,8 @@ def calcular_precisao_ia():
                        (classe_predita == 'N' and categoria_real == 'N'):
                         acertos += 1
                     total += 1
-            except Exception:
+            except Exception as e:
+                print(f"⚠️ Erro na predição do sinal {sinal_id}: {e}")
                 continue
         
         precisao = (acertos / total * 100) if total > 0 else 0.0
@@ -1246,27 +1387,21 @@ def predicao_sinal(sinal_id):
     """Rota para obter predição de um sinal específico"""
     try:
         # Verificar se o classificador está treinado
-        if not classifier or not classifier.is_trained:
+        if not classifier:
+            # Tentar inicializar o classificador se não existir
+            inicializar_classificador()
+            
+        if not classifier or not hasattr(classifier, 'is_trained') or not classifier.is_trained:
             return jsonify({
                 'sucesso': False,
-                'erro': 'Modelo não está treinado'
+                'erro': 'Modelo não está treinado. Clique em "Retreinar" para treinar o modelo.'
             })
         
-        # Fazer predição com timeout
-        import signal
-        
-        def timeout_handler(signum, frame):
-            raise TimeoutError("Predição demorou muito tempo")
-        
-        # Definir timeout de 10 segundos
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(10)
-        
+        # Fazer predição (sem timeout no Windows)
         try:
             predicao = classifier.prever_sinal(sinal_id)
-            signal.alarm(0)  # Cancelar alarme
             
-            if predicao:
+            if predicao and isinstance(predicao, dict):
                 return jsonify({
                     'sucesso': True,
                     'predicao': predicao
@@ -1276,11 +1411,10 @@ def predicao_sinal(sinal_id):
                     'sucesso': False,
                     'erro': 'Não foi possível fazer predição'
                 })
-        except TimeoutError:
-            signal.alarm(0)
+        except Exception as pred_error:
             return jsonify({
                 'sucesso': False,
-                'erro': 'Timeout na predição'
+                'erro': f'Erro na predição: {str(pred_error)}'
             })
             
     except Exception as e:
