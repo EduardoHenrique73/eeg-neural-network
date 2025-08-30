@@ -1,481 +1,818 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema EEG - Testes</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        .testes-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .testes-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            text-align: center;
-        }
-        
-        .testes-header h1 {
-            margin: 0;
-            font-size: 2.5em;
-            font-weight: 300;
-        }
-        
-        .testes-header p {
-            margin: 10px 0 0 0;
-            opacity: 0.9;
-            font-size: 1.1em;
-        }
-        
-        .botoes-teste {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 30px;
-            justify-content: center;
-        }
-        
-        .btn-teste {
-            padding: 15px 30px;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .btn-teste.primario {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        
-        .btn-teste.secundario {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-        }
-        
-        .btn-teste:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        }
-        
-        .btn-teste:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .status-container {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 30px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-        
-        .status-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-weight: 600;
-            margin-bottom: 20px;
-        }
-        
-        .status-idle {
-            background: #f8f9fa;
-            color: #6c757d;
-        }
-        
-        .status-running {
-            background: #fff3cd;
-            color: #856404;
-        }
-        
-        .status-completed {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .status-error {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        .logs-container {
-            background: #1e1e1e;
-            color: #f8f8f2;
-            border-radius: 10px;
-            padding: 20px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-            line-height: 1.5;
-            max-height: 500px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-        }
-        
-        .logs-container::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        .logs-container::-webkit-scrollbar-track {
-            background: #2d2d2d;
-            border-radius: 4px;
-        }
-        
-        .logs-container::-webkit-scrollbar-thumb {
-            background: #555;
-            border-radius: 4px;
-        }
-        
-        .logs-container::-webkit-scrollbar-thumb:hover {
-            background: #777;
-        }
-        
-        .navegacao {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 30px;
-            justify-content: center;
-        }
-        
-        .nav-link {
-            padding: 12px 24px;
-            background: #f8f9fa;
-            color: #495057;
-            text-decoration: none;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-            font-weight: 500;
-        }
-        
-        .nav-link:hover {
-            background: #e9ecef;
-            color: #212529;
-        }
-        
-        .nav-link.ativo {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        
-        .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        .resultado-resumo {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .card-resultado {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        
-        .card-resultado h3 {
-            margin: 0 0 10px 0;
-            color: #495057;
-        }
-        
-        .card-resultado .valor {
-            font-size: 2em;
-            font-weight: bold;
-            color: #667eea;
-        }
-    </style>
-</head>
-<body>
-    <div class="testes-container">
-        <!-- Navegação -->
-        <div class="navegacao">
-            <a href="/" class="nav-link">🏠 Início</a>
-            <a href="/dashboard" class="nav-link">📊 Dashboard</a>
-            <a href="/testes" class="nav-link ativo">🧪 Testes</a>
+{% extends "base.html" %}
+
+{% block title %}Testes - Sistema EEG{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Estilos específicos para testes */
+    .tests-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+        color: var(--white);
+        padding: var(--spacing-8);
+        border-radius: var(--border-radius-lg);
+        margin-bottom: var(--spacing-6);
+        text-align: center;
+    }
+    
+    .tests-title {
+        font-size: var(--font-size-3xl);
+        font-weight: 700;
+        margin-bottom: var(--spacing-4);
+    }
+    
+    .tests-description {
+        font-size: var(--font-size-lg);
+        opacity: 0.9;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    
+    /* Tipos de Teste */
+    .test-types-section {
+        margin-bottom: var(--spacing-8);
+    }
+    
+    .test-types-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: var(--spacing-6);
+        margin-bottom: var(--spacing-6);
+    }
+    
+    .test-type-card {
+        background: var(--white);
+        border-radius: var(--border-radius-lg);
+        padding: var(--spacing-6);
+        box-shadow: var(--shadow);
+        border: 1px solid var(--gray-200);
+        transition: var(--transition);
+        text-align: center;
+    }
+    
+    .test-type-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .test-type-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: var(--border-radius-lg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: var(--font-size-2xl);
+        color: var(--white);
+        margin: 0 auto var(--spacing-4);
+    }
+    
+    .test-type-icon.unit { background: linear-gradient(135deg, #10b981, #059669); }
+    .test-type-icon.integration { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    .test-type-icon.performance { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .test-type-icon.model { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    
+    .test-type-title {
+        font-size: var(--font-size-xl);
+        font-weight: 700;
+        color: var(--gray-900);
+        margin-bottom: var(--spacing-2);
+    }
+    
+    .test-type-description {
+        font-size: var(--font-size-sm);
+        color: var(--gray-600);
+        line-height: 1.5;
+        margin-bottom: var(--spacing-4);
+    }
+    
+    .test-type-features {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        text-align: left;
+    }
+    
+    .test-type-features li {
+        padding: var(--spacing-1) 0;
+        font-size: var(--font-size-sm);
+        color: var(--gray-700);
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-2);
+    }
+    
+    .test-type-features li::before {
+        content: '✓';
+        color: var(--success-color);
+        font-weight: bold;
+    }
+    
+    /* Controles de Teste */
+    .test-controls-section {
+        background: var(--white);
+        border-radius: var(--border-radius-lg);
+        padding: var(--spacing-6);
+        box-shadow: var(--shadow);
+        margin-bottom: var(--spacing-6);
+    }
+    
+    .test-controls-header {
+        text-align: center;
+        margin-bottom: var(--spacing-6);
+    }
+    
+    .test-controls-title {
+        font-size: var(--font-size-xl);
+        font-weight: 700;
+        color: var(--gray-900);
+        margin-bottom: var(--spacing-2);
+    }
+    
+    .test-controls-description {
+        font-size: var(--font-size-sm);
+        color: var(--gray-600);
+    }
+    
+    .test-controls-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: var(--spacing-4);
+    }
+    
+    .test-control-item {
+        text-align: center;
+        padding: var(--spacing-4);
+        background: var(--gray-50);
+        border-radius: var(--border-radius);
+        border: 1px solid var(--gray-200);
+    }
+    
+    .test-control-icon {
+        font-size: var(--font-size-2xl);
+        color: var(--primary-color);
+        margin-bottom: var(--spacing-3);
+    }
+    
+    .test-control-title {
+        font-size: var(--font-size-lg);
+        font-weight: 600;
+        color: var(--gray-900);
+        margin-bottom: var(--spacing-2);
+    }
+    
+    .test-control-description {
+        font-size: var(--font-size-sm);
+        color: var(--gray-600);
+        margin-bottom: var(--spacing-4);
+    }
+    
+    /* Status de Teste */
+    .test-status-section {
+        background: var(--white);
+        border-radius: var(--border-radius-lg);
+        padding: var(--spacing-6);
+        box-shadow: var(--shadow);
+        margin-bottom: var(--spacing-6);
+        display: none;
+    }
+    
+    .test-status-section.show {
+        display: block;
+    }
+    
+    .test-status-header {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-3);
+        margin-bottom: var(--spacing-4);
+    }
+    
+    .test-status-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: var(--font-size-lg);
+        color: var(--white);
+    }
+    
+    .test-status-icon.running { background: var(--warning-color); }
+    .test-status-icon.completed { background: var(--success-color); }
+    .test-status-icon.error { background: var(--error-color); }
+    
+    .test-status-title {
+        font-size: var(--font-size-lg);
+        font-weight: 600;
+        color: var(--gray-900);
+    }
+    
+    .test-status-logs {
+        background: var(--gray-50);
+        border: 1px solid var(--gray-200);
+        border-radius: var(--border-radius);
+        padding: var(--spacing-4);
+        max-height: 300px;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        font-size: var(--font-size-sm);
+        line-height: 1.4;
+    }
+    
+    .test-status-log-entry {
+        margin-bottom: var(--spacing-1);
+        padding: var(--spacing-1);
+        border-radius: var(--border-radius-sm);
+    }
+    
+    .test-status-log-entry.info { background: rgba(59, 130, 246, 0.1); }
+    .test-status-log-entry.success { background: rgba(16, 185, 129, 0.1); }
+    .test-status-log-entry.warning { background: rgba(245, 158, 11, 0.1); }
+    .test-status-log-entry.error { background: rgba(239, 68, 68, 0.1); }
+    
+    /* Resultados de Teste */
+    .test-results-section {
+        display: none;
+    }
+    
+    .test-results-section.show {
+        display: block;
+    }
+    
+    .test-results-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: var(--spacing-6);
+        margin-bottom: var(--spacing-6);
+    }
+    
+    .test-result-card {
+        background: var(--white);
+        border-radius: var(--border-radius-lg);
+        padding: var(--spacing-6);
+        box-shadow: var(--shadow);
+        border: 1px solid var(--gray-200);
+    }
+    
+    .test-result-header {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-3);
+        margin-bottom: var(--spacing-4);
+    }
+    
+    .test-result-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--border-radius-lg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: var(--font-size-xl);
+        color: var(--white);
+    }
+    
+    .test-result-icon.success { background: var(--success-color); }
+    .test-result-icon.warning { background: var(--warning-color); }
+    .test-result-icon.error { background: var(--error-color); }
+    
+    .test-result-title {
+        font-size: var(--font-size-lg);
+        font-weight: 600;
+        color: var(--gray-900);
+    }
+    
+    .test-result-metrics {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-3);
+    }
+    
+    .test-result-metric {
+        text-align: center;
+        padding: var(--spacing-3);
+        background: var(--gray-50);
+        border-radius: var(--border-radius);
+    }
+    
+    .test-result-metric-label {
+        font-size: var(--font-size-sm);
+        color: var(--gray-600);
+        margin-bottom: var(--spacing-1);
+    }
+    
+    .test-result-metric-value {
+        font-size: var(--font-size-xl);
+        font-weight: 700;
+        color: var(--gray-900);
+    }
+    
+    /* Gráficos de Teste */
+    .test-charts-section {
+        background: var(--white);
+        border-radius: var(--border-radius-lg);
+        padding: var(--spacing-6);
+        box-shadow: var(--shadow);
+    }
+    
+    .test-charts-header {
+        text-align: center;
+        margin-bottom: var(--spacing-6);
+    }
+    
+    .test-charts-title {
+        font-size: var(--font-size-xl);
+        font-weight: 700;
+        color: var(--gray-900);
+        margin-bottom: var(--spacing-2);
+    }
+    
+    .test-charts-description {
+        font-size: var(--font-size-sm);
+        color: var(--gray-600);
+    }
+    
+    .test-chart-container {
+        margin-bottom: var(--spacing-6);
+    }
+    
+    .test-chart-container:last-child {
+        margin-bottom: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Header dos Testes -->
+<div class="tests-header">
+    <h1 class="tests-title">
+        <i class="fas fa-vial"></i>
+        Sistema de Testes
+    </h1>
+    <p class="tests-description">
+        Execute testes abrangentes para validar o funcionamento do sistema de análise EEG
+    </p>
+</div>
+
+<!-- Tipos de Teste -->
+<div class="test-types-section">
+    <h2 class="text-2xl font-bold mb-6 text-center">
+        <i class="fas fa-cogs"></i>
+        Tipos de Teste Disponíveis
+    </h2>
+    
+    <div class="test-types-grid">
+        <!-- Testes Unitários -->
+        <div class="test-type-card">
+            <div class="test-type-icon unit">
+                <i class="fas fa-microchip"></i>
+            </div>
+            <div class="test-type-title">Testes Unitários</div>
+            <div class="test-type-description">
+                Testa funções individuais e componentes isolados do sistema.
+            </div>
+            <ul class="test-type-features">
+                <li>Validação de funções</li>
+                <li>Teste de algoritmos</li>
+                <li>Verificação de cálculos</li>
+                <li>Teste de parsing</li>
+            </ul>
         </div>
         
-        <!-- Header -->
-        <div class="testes-header">
-            <h1>🧪 Testes do Sistema</h1>
-            <p>Execute testes automatizados para verificar o funcionamento de todos os componentes</p>
+        <!-- Testes de Integração -->
+        <div class="test-type-card">
+            <div class="test-type-icon integration">
+                <i class="fas fa-puzzle-piece"></i>
+            </div>
+            <div class="test-type-title">Testes de Integração</div>
+            <div class="test-type-description">
+                Testa a integração entre diferentes componentes do sistema.
+            </div>
+            <ul class="test-type-features">
+                <li>Comunicação entre módulos</li>
+                <li>Fluxo de dados</li>
+                <li>Integração com banco</li>
+                <li>APIs e endpoints</li>
+            </ul>
         </div>
         
-        <!-- Botões de ação -->
-        <div class="botoes-teste">
-            <button id="btnRetreinar" class="btn-teste primario">
-                🔄 Retreinar Modelo
-            </button>
-            <button id="btnExecutarTestes" class="btn-teste secundario">
-                🧪 Executar Testes
-            </button>
+        <!-- Testes de Performance -->
+        <div class="test-type-card">
+            <div class="test-type-icon performance">
+                <i class="fas fa-tachometer-alt"></i>
+            </div>
+            <div class="test-type-title">Testes de Performance</div>
+            <div class="test-type-description">
+                Avalia o desempenho e eficiência do sistema sob carga.
+            </div>
+            <ul class="test-type-features">
+                <li>Tempo de resposta</li>
+                <li>Uso de memória</li>
+                <li>Processamento de dados</li>
+                <li>Escalabilidade</li>
+            </ul>
         </div>
         
-        <!-- Status do Retreinamento -->
-        <div class="status-container">
-            <h3>🔄 Status do Retreinamento</h3>
-            <div id="statusRetreinamento" class="status-indicator status-idle">
-                <span>⏸️</span>
-                <span>Ocioso</span>
+        <!-- Testes de Modelo -->
+        <div class="test-type-card">
+            <div class="test-type-icon model">
+                <i class="fas fa-brain"></i>
             </div>
-            <div id="logsRetreinamento" class="logs-container" style="display: none;"></div>
-        </div>
-        
-        <!-- Status dos Testes -->
-        <div class="status-container">
-            <h3>🧪 Status dos Testes</h3>
-            <div id="statusTestes" class="status-indicator status-idle">
-                <span>⏸️</span>
-                <span>Ocioso</span>
+            <div class="test-type-title">Testes de Modelo</div>
+            <div class="test-type-description">
+                Valida a precisão e confiabilidade dos modelos de IA.
             </div>
-            <div id="logsTestes" class="logs-container" style="display: none;"></div>
-        </div>
-        
-        <!-- Resumo dos Resultados -->
-        <div id="resumoResultados" class="resultado-resumo" style="display: none;">
-            <div class="card-resultado">
-                <h3>⏱️ Tempo Total</h3>
-                <div class="valor" id="tempoTotal">-</div>
-            </div>
-            <div class="card-resultado">
-                <h3>✅ Testes Passaram</h3>
-                <div class="valor" id="testesSucesso">-</div>
-            </div>
-            <div class="card-resultado">
-                <h3>📊 Total de Testes</h3>
-                <div class="valor" id="totalTestes">-</div>
-            </div>
+            <ul class="test-type-features">
+                <li>Acurácia dos modelos</li>
+                <li>Validação cruzada</li>
+                <li>Teste de generalização</li>
+                <li>Análise de métricas</li>
+            </ul>
         </div>
     </div>
+</div>
 
-    <script>
-        // Variáveis globais
-        let retrainingInterval = null;
-        let testesInterval = null;
+<!-- Controles de Teste -->
+<div class="test-controls-section">
+    <div class="test-controls-header">
+        <h3 class="test-controls-title">
+            <i class="fas fa-play-circle"></i>
+            Executar Testes
+        </h3>
+        <p class="test-controls-description">
+            Selecione o tipo de teste que deseja executar
+        </p>
+    </div>
+    
+    <div class="test-controls-grid">
+        <div class="test-control-item">
+            <div class="test-control-icon">
+                <i class="fas fa-microchip"></i>
+            </div>
+            <div class="test-control-title">Testes Unitários</div>
+            <div class="test-control-description">
+                Testa funções individuais do sistema
+            </div>
+            <button class="btn btn-primary" onclick="executarTeste('unit')">
+                <i class="fas fa-play"></i>
+                Executar
+            </button>
+        </div>
         
-        // Elementos DOM
-        const btnRetreinar = document.getElementById('btnRetreinar');
-        const btnExecutarTestes = document.getElementById('btnExecutarTestes');
-        const statusRetreinamento = document.getElementById('statusRetreinamento');
-        const logsRetreinamento = document.getElementById('logsRetreinamento');
-        const statusTestes = document.getElementById('statusTestes');
-        const logsTestes = document.getElementById('logsTestes');
-        const resumoResultados = document.getElementById('resumoResultados');
+        <div class="test-control-item">
+            <div class="test-control-icon">
+                <i class="fas fa-puzzle-piece"></i>
+            </div>
+            <div class="test-control-title">Testes de Integração</div>
+            <div class="test-control-description">
+                Testa integração entre componentes
+            </div>
+            <button class="btn btn-primary" onclick="executarTeste('integration')">
+                <i class="fas fa-play"></i>
+                Executar
+            </button>
+        </div>
         
-        // Função para atualizar status do retreinamento
-        function atualizarStatusRetreinamento() {
-            fetch('/status_retreinamento')
-                .then(response => response.json())
-                .then(data => {
-                    const status = data.status;
-                    const logs = data.logs;
-                    
-                    // Atualizar indicador de status
-                    statusRetreinamento.className = `status-indicator status-${status}`;
-                    
-                    if (status === 'idle') {
-                        statusRetreinamento.innerHTML = '<span>⏸️</span><span>Ocioso</span>';
-                        logsRetreinamento.style.display = 'none';
-                        btnRetreinar.disabled = false;
-                        btnRetreinar.innerHTML = '🔄 Retreinar Modelo';
-                        if (retrainingInterval) {
-                            clearInterval(retrainingInterval);
-                            retrainingInterval = null;
-                        }
-                    } else if (status === 'running') {
-                        statusRetreinamento.innerHTML = '<span class="spinner"></span><span>Executando...</span>';
-                        logsRetreinamento.style.display = 'block';
-                        logsRetreinamento.textContent = logs.join('\n');
-                        logsRetreinamento.scrollTop = logsRetreinamento.scrollHeight;
-                        btnRetreinar.disabled = true;
-                        btnRetreinar.innerHTML = '🔄 Executando...';
-                    } else if (status === 'completed') {
-                        statusRetreinamento.innerHTML = '<span>✅</span><span>Concluído</span>';
-                        logsRetreinamento.style.display = 'block';
-                        logsRetreinamento.textContent = logs.join('\n');
-                        logsRetreinamento.scrollTop = logsRetreinamento.scrollHeight;
-                        btnRetreinar.disabled = false;
-                        btnRetreinar.innerHTML = '🔄 Retreinar Modelo';
-                        if (retrainingInterval) {
-                            clearInterval(retrainingInterval);
-                            retrainingInterval = null;
-                        }
-                    } else if (status === 'error') {
-                        statusRetreinamento.innerHTML = '<span>❌</span><span>Erro</span>';
-                        logsRetreinamento.style.display = 'block';
-                        logsRetreinamento.textContent = logs.join('\n');
-                        logsRetreinamento.scrollTop = logsRetreinamento.scrollHeight;
-                        btnRetreinar.disabled = false;
-                        btnRetreinar.innerHTML = '🔄 Retreinar Modelo';
-                        if (retrainingInterval) {
-                            clearInterval(retrainingInterval);
-                            retrainingInterval = null;
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao verificar status do retreinamento:', error);
-                });
+        <div class="test-control-item">
+            <div class="test-control-icon">
+                <i class="fas fa-tachometer-alt"></i>
+            </div>
+            <div class="test-control-title">Testes de Performance</div>
+            <div class="test-control-description">
+                Avalia desempenho do sistema
+            </div>
+            <button class="btn btn-primary" onclick="executarTeste('performance')">
+                <i class="fas fa-play"></i>
+                Executar
+            </button>
+        </div>
+        
+        <div class="test-control-item">
+            <div class="test-control-icon">
+                <i class="fas fa-brain"></i>
+            </div>
+            <div class="test-control-title">Testes de Modelo</div>
+            <div class="test-control-description">
+                Valida modelos de IA
+            </div>
+            <button class="btn btn-primary" onclick="executarTeste('model')">
+                <i class="fas fa-play"></i>
+                Executar
+            </button>
+        </div>
+        
+        <div class="test-control-item">
+            <div class="test-control-icon">
+                <i class="fas fa-rocket"></i>
+            </div>
+            <div class="test-control-title">Todos os Testes</div>
+            <div class="test-control-description">
+                Executa todos os tipos de teste
+            </div>
+            <button class="btn btn-success" onclick="executarTeste('all')">
+                <i class="fas fa-play"></i>
+                Executar Todos
+            </button>
+        </div>
+        
+        <div class="test-control-item">
+            <div class="test-control-icon">
+                <i class="fas fa-trash"></i>
+            </div>
+            <div class="test-control-title">Limpar Resultados</div>
+            <div class="test-control-description">
+                Remove resultados anteriores
+            </div>
+            <button class="btn btn-secondary" onclick="limparResultados()">
+                <i class="fas fa-trash"></i>
+                Limpar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Status de Teste -->
+<div class="test-status-section" id="testStatusSection">
+    <div class="test-status-header">
+        <div class="test-status-icon" id="testStatusIcon">
+            <i class="fas fa-spinner fa-spin"></i>
+        </div>
+        <div class="test-status-title" id="testStatusTitle">Executando testes...</div>
+    </div>
+    
+    <div class="test-status-logs" id="testStatusLogs">
+        <!-- Logs serão inseridos aqui -->
+    </div>
+</div>
+
+<!-- Resultados de Teste -->
+<div class="test-results-section" id="testResultsSection">
+    <h2 class="text-2xl font-bold mb-6 text-center">
+        <i class="fas fa-chart-bar"></i>
+        Resultados dos Testes
+    </h2>
+    
+    <div class="test-results-grid" id="testResultsGrid">
+        <!-- Resultados serão inseridos aqui -->
+    </div>
+    
+    <!-- Gráficos de Teste -->
+    <div class="test-charts-section">
+        <div class="test-charts-header">
+            <h3 class="test-charts-title">
+                <i class="fas fa-chart-line"></i>
+                Análise de Resultados
+            </h3>
+            <p class="test-charts-description">
+                Visualize os resultados dos testes através de gráficos
+            </p>
+        </div>
+        
+        <div class="test-chart-container" id="testMetricsChart">
+            <!-- Gráfico de métricas será inserido aqui -->
+        </div>
+        
+        <div class="test-chart-container" id="testPerformanceChart">
+            <!-- Gráfico de performance será inserido aqui -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let testRunning = false;
+    
+    // Executar teste
+    function executarTeste(tipo) {
+        if (testRunning) {
+            Utils.showMessage('Teste já está em andamento', 'warning');
+            return;
         }
         
-        // Função para atualizar status dos testes
-        function atualizarStatusTestes() {
+        testRunning = true;
+        
+        // Atualizar interface
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.disabled = true;
+        });
+        
+        // Mostrar seção de status
+        document.getElementById('testStatusSection').classList.add('show');
+        document.getElementById('testStatusIcon').className = 'test-status-icon running';
+        document.getElementById('testStatusIcon').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        document.getElementById('testStatusTitle').textContent = `Executando testes ${tipo}...`;
+        
+        // Limpar logs anteriores
+        document.getElementById('testStatusLogs').innerHTML = '';
+        
+        // Fazer requisição
+        fetch('/executar_testes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ tipo: tipo })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'started') {
+                Utils.showMessage('Testes iniciados com sucesso!', 'success');
+                pollTestStatus();
+            } else {
+                throw new Error(data.message || 'Erro ao iniciar testes');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            Utils.showMessage('Erro ao executar testes: ' + error.message, 'error');
+            resetTestInterface();
+        });
+    }
+    
+    // Polling do status dos testes
+    function pollTestStatus() {
+        const pollInterval = setInterval(() => {
             fetch('/status_testes')
-                .then(response => response.json())
-                .then(data => {
-                    const status = data.status;
-                    const logs = data.logs;
-                    
-                    // Atualizar indicador de status
-                    statusTestes.className = `status-indicator status-${status}`;
-                    
-                    if (status === 'idle') {
-                        statusTestes.innerHTML = '<span>⏸️</span><span>Ocioso</span>';
-                        logsTestes.style.display = 'none';
-                        btnExecutarTestes.disabled = false;
-                        btnExecutarTestes.innerHTML = '🧪 Executar Testes';
-                        resumoResultados.style.display = 'none';
-                        if (testesInterval) {
-                            clearInterval(testesInterval);
-                            testesInterval = null;
-                        }
-                    } else if (status === 'running') {
-                        statusTestes.innerHTML = '<span class="spinner"></span><span>Executando...</span>';
-                        logsTestes.style.display = 'block';
-                        logsTestes.textContent = logs.join('\n');
-                        logsTestes.scrollTop = logsTestes.scrollHeight;
-                        btnExecutarTestes.disabled = true;
-                        btnExecutarTestes.innerHTML = '🧪 Executando...';
-                    } else if (status === 'completed') {
-                        statusTestes.innerHTML = '<span>✅</span><span>Concluído</span>';
-                        logsTestes.style.display = 'block';
-                        logsTestes.textContent = logs.join('\n');
-                        logsTestes.scrollTop = logsTestes.scrollHeight;
-                        btnExecutarTestes.disabled = false;
-                        btnExecutarTestes.innerHTML = '🧪 Executar Testes';
-                        resumoResultados.style.display = 'grid';
-                        
-                        // Extrair informações do resumo dos logs
-                        const ultimoLog = logs[logs.length - 1];
-                        if (ultimoLog && ultimoLog.includes('Testes passaram:')) {
-                            const match = ultimoLog.match(/(\d+)\/(\d+)/);
-                            if (match) {
-                                document.getElementById('testesSucesso').textContent = match[1];
-                                document.getElementById('totalTestes').textContent = match[2];
-                            }
-                        }
-                        
-                        // Extrair tempo total
-                        const tempoLog = logs.find(log => log.includes('Testes concluídos em'));
-                        if (tempoLog) {
-                            const tempoMatch = tempoLog.match(/(\d+\.\d+)s/);
-                            if (tempoMatch) {
-                                document.getElementById('tempoTotal').textContent = tempoMatch[1] + 's';
-                            }
-                        }
-                        
-                        if (testesInterval) {
-                            clearInterval(testesInterval);
-                            testesInterval = null;
-                        }
-                    } else if (status === 'error') {
-                        statusTestes.innerHTML = '<span>❌</span><span>Erro</span>';
-                        logsTestes.style.display = 'block';
-                        logsTestes.textContent = logs.join('\n');
-                        logsTestes.scrollTop = logsTestes.scrollHeight;
-                        btnExecutarTestes.disabled = false;
-                        btnExecutarTestes.innerHTML = '🧪 Executar Testes';
-                        if (testesInterval) {
-                            clearInterval(testesInterval);
-                            testesInterval = null;
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao verificar status dos testes:', error);
-                });
+            .then(response => response.json())
+            .then(data => {
+                updateTestStatus(data);
+                
+                if (data.status === 'completed') {
+                    clearInterval(pollInterval);
+                    testRunning = false;
+                    showTestResults(data.results);
+                    resetTestInterface();
+                } else if (data.status === 'error') {
+                    clearInterval(pollInterval);
+                    testRunning = false;
+                    Utils.showMessage('Erro nos testes: ' + data.message, 'error');
+                    resetTestInterface();
+                }
+            })
+            .catch(error => {
+                console.error('Erro no polling:', error);
+                clearInterval(pollInterval);
+                testRunning = false;
+                Utils.showMessage('Erro ao verificar status', 'error');
+                resetTestInterface();
+            });
+        }, 1000);
+    }
+    
+    // Atualizar status dos testes
+    function updateTestStatus(data) {
+        const statusIcon = document.getElementById('testStatusIcon');
+        const statusTitle = document.getElementById('testStatusTitle');
+        const statusLogs = document.getElementById('testStatusLogs');
+        
+        // Atualizar ícone e título
+        if (data.status === 'running') {
+            statusIcon.className = 'test-status-icon running';
+            statusIcon.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            statusTitle.textContent = 'Executando testes...';
+        } else if (data.status === 'completed') {
+            statusIcon.className = 'test-status-icon completed';
+            statusIcon.innerHTML = '<i class="fas fa-check"></i>';
+            statusTitle.textContent = 'Testes concluídos!';
+        } else if (data.status === 'error') {
+            statusIcon.className = 'test-status-icon error';
+            statusIcon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+            statusTitle.textContent = 'Erro nos testes';
         }
         
-        // Event listeners
-        btnRetreinar.addEventListener('click', function() {
-            fetch('/retreinar', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'started') {
-                    // Iniciar polling do status
-                    if (!retrainingInterval) {
-                        retrainingInterval = setInterval(atualizarStatusRetreinamento, 1000);
-                    }
-                } else {
-                    alert(data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao iniciar retreinamento:', error);
-                alert('Erro ao iniciar retreinamento');
+        // Atualizar logs
+        if (data.logs && data.logs.length > 0) {
+            statusLogs.innerHTML = '';
+            data.logs.forEach(log => {
+                const logEntry = document.createElement('div');
+                logEntry.className = 'test-status-log-entry info';
+                logEntry.textContent = log;
+                statusLogs.appendChild(logEntry);
             });
+            statusLogs.scrollTop = statusLogs.scrollHeight;
+        }
+    }
+    
+    // Mostrar resultados dos testes
+    function showTestResults(results) {
+        const resultsSection = document.getElementById('testResultsSection');
+        const resultsGrid = document.getElementById('testResultsGrid');
+        
+        // Limpar resultados anteriores
+        resultsGrid.innerHTML = '';
+        
+        // Criar cards de resultados
+        Object.keys(results).forEach(testType => {
+            const testData = results[testType];
+            const resultCard = createTestResultCard(testType, testData);
+            resultsGrid.appendChild(resultCard);
         });
         
-        btnExecutarTestes.addEventListener('click', function() {
-            fetch('/executar_testes', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'started') {
-                    // Iniciar polling do status
-                    if (!testesInterval) {
-                        testesInterval = setInterval(atualizarStatusTestes, 1000);
-                    }
-                } else {
-                    alert(data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao iniciar testes:', error);
-                alert('Erro ao iniciar testes');
-            });
-        });
+        // Mostrar seção de resultados
+        resultsSection.classList.add('show');
         
-        // Inicializar status ao carregar a página
-        document.addEventListener('DOMContentLoaded', function() {
-            atualizarStatusRetreinamento();
-            atualizarStatusTestes();
+        // Criar gráficos
+        createTestCharts(results);
+    }
+    
+    // Criar card de resultado de teste
+    function createTestResultCard(testType, testData) {
+        const card = document.createElement('div');
+        card.className = 'test-result-card';
+        
+        const iconClass = {
+            'unit': 'success',
+            'integration': 'success',
+            'performance': 'warning',
+            'model': 'success'
+        }[testType] || 'success';
+        
+        const icon = {
+            'unit': 'fas fa-microchip',
+            'integration': 'fas fa-puzzle-piece',
+            'performance': 'fas fa-tachometer-alt',
+            'model': 'fas fa-brain'
+        }[testType] || 'fas fa-check';
+        
+        const title = {
+            'unit': 'Testes Unitários',
+            'integration': 'Testes de Integração',
+            'performance': 'Testes de Performance',
+            'model': 'Testes de Modelo'
+        }[testType] || testType;
+        
+        card.innerHTML = `
+            <div class="test-result-header">
+                <div class="test-result-icon ${iconClass}">
+                    <i class="${icon}"></i>
+                </div>
+                <div class="test-result-title">${title}</div>
+            </div>
+            <div class="test-result-metrics">
+                <div class="test-result-metric">
+                    <div class="test-result-metric-label">Testes Executados</div>
+                    <div class="test-result-metric-value">${testData.total || 0}</div>
+                </div>
+                <div class="test-result-metric">
+                    <div class="test-result-metric-label">Sucessos</div>
+                    <div class="test-result-metric-value">${testData.passed || 0}</div>
+                </div>
+                <div class="test-result-metric">
+                    <div class="test-result-metric-label">Falhas</div>
+                    <div class="test-result-metric-value">${testData.failed || 0}</div>
+                </div>
+                <div class="test-result-metric">
+                    <div class="test-result-metric-label">Taxa de Sucesso</div>
+                    <div class="test-result-metric-value">${testData.total > 0 ? ((testData.passed / testData.total) * 100).toFixed(1) : 0}%</div>
+                </div>
+            </div>
+        `;
+        
+        return card;
+    }
+    
+    // Criar gráficos de teste
+    function createTestCharts(results) {
+        // Gráfico de métricas por tipo de teste
+        const metricsData = Object.keys(results).map(testType => ({
+            x: [testType],
+            y: [results[testType].total || 0],
+            type: 'bar',
+            name: testType,
+            marker: {
+                color: {
+                    'unit': '#10b981',
+                    'integration': '#3b82f6',
+                    'performance': '#f59e0b',
+                    'model': '#8b5cf6'
+                }[testType] || '#64748b'
+            }
+        }));
+        
+        const metricsLayout = {
+            title: 'Testes por Tipo',
+            xaxis: { title: 'Tipo de Teste' },
+            yaxis: { title: 'Quantidade' }
+        };
+        
+        Plotly.newPlot('testMetricsChart', metricsData, metricsLayout);
+    }
+    
+    // Limpar resultados
+    function limparResultados() {
+        document.getElementById('testResultsSection').classList.remove('show');
+        document.getElementById('testStatusSection').classList.remove('show');
+        Utils.showMessage('Resultados limpos', 'info');
+    }
+    
+    // Resetar interface de teste
+    function resetTestInterface() {
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.disabled = false;
         });
-    </script>
-</body>
-</html>
+        document.getElementById('testStatusSection').classList.remove('show');
+    }
+</script>
+{% endblock %}

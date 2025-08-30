@@ -5,16 +5,11 @@ from collections import Counter
 import psycopg2
 import matplotlib
 matplotlib.use('Agg')  # Backend não interativo para servidores
+from config import config
 
 def obter_conexao_db():
     """Conecta ao banco de dados PostgreSQL"""
-    return psycopg2.connect(
-        dbname="eeg-projeto",
-        user="postgres",
-        password="EEG@321",
-        host="localhost",
-        port="5432"
-    )
+    return psycopg2.connect(**config.get_db_connection_string())
 
 def obter_dados_sinal(cursor, id_sinal):
     """Busca os valores brutos do sinal no banco de dados"""

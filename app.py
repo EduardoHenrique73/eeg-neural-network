@@ -8,13 +8,15 @@ from dinamica_simbolica import aplicar_dinamica_simbolica
 from modulo_funcoes import gerar_grafico_interativo
 from ml_classifier import EEGClassifier
 from testes_sistema import TestadorSistema
+from modelo_comparador import ModeloComparador
 import numpy as np
 import uuid
+from config import config
 
 app = Flask(__name__)
 
 # Configuração para upload de arquivos
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
+app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -28,15 +30,13 @@ retraining_status = "idle"  # idle, running, completed, error
 test_logs = []
 test_status = "idle"
 
+# Modelos globais para evitar retreinamento desnecessário
+classifier_cnn = None
+classifier_lstm = None
+
 def obter_conexao_db():
     """Conecta ao banco de dados PostgreSQL."""
-    return psycopg2.connect(
-        dbname="eeg-projeto",
-        user="postgres",
-        password="EEG@321",
-        host="localhost",
-        port="5432"
-    )
+    return psycopg2.connect(**config.get_db_connection_string())
 
 def inicializar_classificador():
     """Inicializa o classificador, carregando modelo salvo ou treinando novo."""
@@ -50,7 +50,7 @@ def inicializar_classificador():
     
     try:
         log_retraining("🔍 Tentando carregar modelo existente...")
-        classifier.carregar_modelo()
+        classifier.carregar_modelo(config.MODEL_PATH)
         if classifier.is_trained:
             log_retraining("✅ Modelo carregado com sucesso!")
             return True
@@ -72,7 +72,7 @@ def inicializar_classificador():
         log_retraining("✅ Treinamento concluído com sucesso!")
         
         log_retraining("💾 Salvando modelo...")
-        classifier.salvar_modelo()
+        classifier.salvar_modelo(config.MODEL_PATH)
         log_retraining("✅ Modelo salvo com sucesso!")
         
         return True
@@ -87,17 +87,96 @@ def home():
         resultado = gerar_grafico_interativo(limite=10, filtro_categoria=categoria)
         graficos_html = resultado['graficos_html']
         histogramas = []
+        
+        # Criar modelos adicionais para comparação (APENAS UMA VEZ, fora do loop)
+        global classifier_cnn, classifier_lstm
+        
+        # Inicializar MLP Tabular se necessário (melhor para dados tabulares)
+        if classifier_cnn is None:
+                   try:
+                       print("🧠 Criando modelo MLP Tabular...")
+                       classifier_cnn = EEGClassifier()
+                       classifier_cnn.criar_modelo('mlp_tabular')
+                       
+                       # Tentar carregar MLP salvo
+                       if classifier_cnn.carregar_modelo('modelo_mlp_tabular.pkl'):
+                           print("✅ MLP Tabular carregado do arquivo salvo!")
+                       else:
+                           # Treinar novo MLP
+                           X_temp, y_temp, _ = classifier_cnn.criar_dataset(limite=20)
+                           if X_temp is not None and len(X_temp) > 0:
+                               print(f"📊 Treinando MLP Tabular com {X_temp.shape[0]} amostras...")
+                               classifier_cnn.treinar_modelo(X_temp, y_temp)
+                               classifier_cnn.salvar_modelo('modelo_mlp_tabular.pkl')
+                               print("✅ MLP Tabular treinado e salvo!")
+                           else:
+                               print("❌ Não foi possível criar dataset para MLP")
+                               classifier_cnn = None
+                   except Exception as e:
+                       print(f"❌ Erro ao criar MLP Tabular: {e}")
+                       classifier_cnn = None
+        
+        # Inicializar LSTM se necessário
+        if classifier_lstm is None:
+            try:
+                print("🧠 Criando modelo LSTM...")
+                classifier_lstm = EEGClassifier()
+                classifier_lstm.criar_modelo('lstm')
+                
+                # Tentar carregar LSTM salvo
+                if classifier_lstm.carregar_modelo('modelo_lstm.pkl'):
+                    print("✅ LSTM carregado do arquivo salvo!")
+                else:
+                    # Treinar novo LSTM
+                    X_temp, y_temp, _ = classifier_lstm.criar_dataset(limite=20)
+                    if X_temp is not None and len(X_temp) > 0:
+                        print(f"📊 Treinando LSTM com {X_temp.shape[0]} amostras...")
+                        classifier_lstm.treinar_modelo(X_temp, y_temp)
+                        classifier_lstm.salvar_modelo('modelo_lstm.pkl')
+                        print("✅ LSTM treinado e salvo!")
+                    else:
+                        print("❌ Não foi possível criar dataset para LSTM")
+                        classifier_lstm = None
+            except Exception as e:
+                print(f"❌ Erro ao criar LSTM: {e}")
+                classifier_lstm = None
+        
+        # Agora processar cada sinal (sem criar modelos novamente)
         for sinal in resultado['dados_sinais']:
             try:
                 resultado_ds = aplicar_dinamica_simbolica(sinal['id'], m=3)
                 if resultado_ds is None:
                     continue
                 predicao = None
+                predicao_cnn = None
+                predicao_lstm = None
+                
                 if classifier.is_trained:
                     try:
                         predicao = classifier.prever_sinal(sinal['id'])
                     except Exception:
                         pass
+                
+                # Fazer predições com modelos treinados
+                try:
+                    if classifier_cnn and classifier_cnn.is_trained:
+                        print(f"🔮 Fazendo predição MLP Tabular para sinal {sinal['id']}...")
+                        predicao_cnn = classifier_cnn.prever_sinal(sinal['id'])
+                        print(f"✅ Predição MLP Tabular: {predicao_cnn}")
+                    else:
+                        print("❌ MLP Tabular não está treinado")
+                except Exception as e:
+                    print(f"❌ Erro na predição MLP Tabular: {e}")
+                
+                try:
+                    if classifier_lstm and classifier_lstm.is_trained:
+                        print(f"🔮 Fazendo predição LSTM para sinal {sinal['id']}...")
+                        predicao_lstm = classifier_lstm.prever_sinal(sinal['id'])
+                        print(f"✅ Predição LSTM: {predicao_lstm}")
+                    else:
+                        print("❌ LSTM não está treinado")
+                except Exception as e:
+                    print(f"❌ Erro na predição LSTM: {e}")
                 sequencia_binaria = resultado_ds.get('sequencia_binaria', [])[:20]
                 grupos_binarios = resultado_ds.get('grupos_binarios', [])[:10]
                 palavras_decimais = resultado_ds.get('palavras_decimais', [])[:10]
@@ -110,10 +189,14 @@ def home():
                     'sequencia_binaria': sequencia_binaria,
                     'grupos_binarios': grupos_binarios,
                     'palavras_decimais': palavras_decimais,
-                    'predicao': predicao
+                    'predicao': predicao,
+                    'predicao_cnn': predicao_cnn,
+                    'predicao_lstm': predicao_lstm
                 })
             except Exception:
                 continue
+
+
         return render_template(
             "grafico.html",
             graficos_html=graficos_html,
@@ -153,6 +236,73 @@ def retreinar():
     thread.start()
     
     return jsonify({"status": "started", "message": "Retreinamento iniciado"})
+
+@app.route("/retreinar_todos", methods=["POST"])
+def retreinar_todos():
+    """Rota para retreinar todos os modelos de IA."""
+    global retraining_status
+    
+    if retraining_status == "running":
+        return jsonify({"status": "running", "message": "Retreinamento já está em andamento"})
+    
+    # Inicia o retreinamento de todos os modelos em background
+    thread = threading.Thread(target=executar_retreinamento_todos_background)
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({"status": "started", "message": "Retreinamento de todos os modelos iniciado"})
+
+def executar_retreinamento_todos_background():
+    """Executa o retreinamento de todos os modelos em background"""
+    global retraining_status, retraining_logs
+    retraining_status = "running"
+    retraining_logs.clear()
+    
+    try:
+        def log_retraining(mensagem):
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            log_entry = f"[{timestamp}] {mensagem}"
+            retraining_logs.append(log_entry)
+            print(log_entry)
+        
+        log_retraining("🚀 Iniciando retreinamento de todos os modelos...")
+        
+        # Criar dataset
+        log_retraining("📊 Criando dataset de treinamento...")
+        X, y, _ = classifier.criar_dataset(limite=20)
+        log_retraining(f"✅ Dataset criado: {X.shape[0]} amostras, {X.shape[1]} features")
+        
+        # Retreinar Random Forest (modelo principal)
+        log_retraining("🧠 Retreinando Random Forest...")
+        classifier.criar_modelo(tipo_modelo='random_forest')
+        classifier.treinar_modelo(X, y)
+        classifier.salvar_modelo()
+        log_retraining("✅ Random Forest retreinado!")
+        
+        # Retreinar CNN
+        log_retraining("🧠 Retreinando CNN...")
+        global classifier_cnn
+        classifier_cnn = EEGClassifier()
+        classifier_cnn.criar_modelo('mlp_tabular')
+        classifier_cnn.treinar_modelo(X, y)
+        classifier_cnn.salvar_modelo('modelo_mlp_tabular.pkl')
+        log_retraining("✅ MLP Tabular retreinado e salvo!")
+        
+        # Retreinar LSTM
+        log_retraining("🧠 Retreinando LSTM...")
+        global classifier_lstm
+        classifier_lstm = EEGClassifier()
+        classifier_lstm.criar_modelo('lstm')
+        classifier_lstm.treinar_modelo(X, y)
+        classifier_lstm.salvar_modelo('modelo_lstm.pkl')
+        log_retraining("✅ LSTM retreinado e salvo!")
+        
+        log_retraining("🎉 Todos os modelos foram retreinados com sucesso!")
+        retraining_status = "completed"
+        
+    except Exception as e:
+        log_retraining(f"❌ Erro durante retreinamento: {e}")
+        retraining_status = "error"
 
 @app.route("/status_retreinamento")
 def status_retreinamento():
@@ -274,6 +424,58 @@ def pagina_testes():
     """Página para visualizar e executar testes"""
     return render_template("testes.html")
 
+@app.route("/comparador")
+def pagina_comparador():
+    """Página para comparar modelos de rede neural"""
+    return render_template("comparador.html")
+
+@app.route("/executar_comparacao", methods=["POST"])
+def executar_comparacao():
+    """Executa comparação de modelos em background"""
+    global test_status, test_logs
+    test_status = "running"
+    test_logs.clear()
+    
+    try:
+        # Criar comparador
+        comparador = ModeloComparador()
+        
+        # Adicionar modelos
+        comparador.adicionar_modelo("Random Forest", "random_forest")
+        comparador.adicionar_modelo("MLP", "mlp")
+        comparador.adicionar_modelo("CNN", "cnn")
+        comparador.adicionar_modelo("LSTM", "lstm")
+        comparador.adicionar_modelo("Hybrid CNN-LSTM", "hybrid")
+        
+        # Criar dataset
+        classifier_temp = EEGClassifier()
+        X, y, _ = classifier_temp.criar_dataset(limite=50)
+        
+        if X is not None and len(X) > 0:
+            # Treinar modelos
+            comparador.treinar_todos_modelos(X, y)
+            
+            # Avaliar modelos
+            metricas = comparador.avaliar_modelos(X, y)
+            
+            # Gerar visualizações
+            comparador.plotar_comparacao_metricas(metricas)
+            comparador.plotar_curvas_treino()
+            
+            # Gerar relatório
+            comparador.gerar_relatorio(metricas)
+            
+            test_status = "completed"
+        else:
+            test_logs.append("❌ Não foi possível criar dataset")
+            test_status = "error"
+            
+    except Exception as e:
+        test_logs.append(f"❌ Erro na comparação: {e}")
+        test_status = "error"
+    
+    return jsonify({"status": "started", "message": "Comparação iniciada"})
+
 def processar_arquivo_eeg(arquivo):
     """
     Processa um arquivo EEG enviado pelo usuário
@@ -296,21 +498,20 @@ def processar_arquivo_eeg(arquivo):
         arquivo.save(caminho_arquivo)
         
         # Ler dados do arquivo
-        try:
-            with open(caminho_arquivo, 'r') as f:
-                linhas = f.readlines()
-            
-            # Processar linhas (remover espaços, quebras de linha, etc.)
-            valores = []
-            for linha in linhas:
-                linha = linha.strip()
-                if linha and linha.replace('.', '').replace('-', '').isdigit():
-                    valores.append(float(linha))
-            
-            if len(valores) == 0:
-                return {'erro': 'Nenhum valor numérico encontrado no arquivo'}
-            
-            print(f"📊 Valores lidos: {len(valores)} amostras")
+        with open(caminho_arquivo, 'r') as f:
+            linhas = f.readlines()
+        
+        # Processar linhas (remover espaços, quebras de linha, etc.)
+        valores = []
+        for linha in linhas:
+            linha = linha.strip()
+            if linha and linha.replace('.', '').replace('-', '').isdigit():
+                valores.append(float(linha))
+        
+        if len(valores) == 0:
+            return {'erro': 'Nenhum valor numérico encontrado no arquivo'}
+        
+        print(f"📊 Valores lidos: {len(valores)} amostras")
             
             # Inserir no banco de dados
             try:
@@ -334,12 +535,12 @@ def processar_arquivo_eeg(arquivo):
             """, (nome_arquivo, id_usuario))
             id_sinal = cursor.fetchone()[0]
             
-            # Inserir valores
-            for valor in valores:
-                cursor.execute("""
-                    INSERT INTO valores_sinais (idsinal, valor) 
-                    VALUES (%s, %s)
-                """, (id_sinal, valor))
+            # Inserir valores em lote (otimizado)
+            valores_para_inserir = [(id_sinal, valor) for valor in valores]
+            cursor.executemany("""
+                INSERT INTO valores_sinais (idsinal, valor) 
+                VALUES (%s, %s)
+            """, valores_para_inserir)
             
             conexao.commit()
             cursor.close()
@@ -431,9 +632,225 @@ def processar_arquivo_eeg(arquivo):
             
         except Exception as e:
             return {'erro': f'Erro ao processar arquivo: {str(e)}'}
-            
+
+def aplicar_dinamica_simbolica_direta(valores, id_sinal, m=3):
+    """
+    Aplica dinâmica simbólica diretamente aos valores fornecidos
+    """
+    try:
+        import numpy as np
+        from collections import Counter
+        import matplotlib.pyplot as plt
+        import os
+        
+        # Converter para numpy array
+        valores = np.array(valores)
+        
+        # Calcular limiar (média)
+        limiar = np.mean(valores)
+        
+        # Gerar sequência binária
+        sequencia_binaria = ['1' if x >= limiar else '0' for x in valores]
+        
+        # Gerar grupos deslizantes
+        grupos_binarios = [''.join(sequencia_binaria[i:i+m]) for i in range(len(sequencia_binaria)-m+1)]
+        
+        # Converter para decimal
+        palavras_decimais = [int(grupo, 2) for grupo in grupos_binarios]
+        
+        # Calcular frequências
+        contagem = Counter(palavras_decimais)
+        total = sum(contagem.values())
+        frequencias = {k: v/total for k, v in contagem.items()}
+        
+        # Calcular entropia
+        probabilidades = np.array(list(frequencias.values()))
+        probabilidades_filtradas = probabilidades[(probabilidades > 0) & (probabilidades < 1)]
+        if len(probabilidades_filtradas) == 0:
+            entropia = 0.0
+        else:
+            probabilidades_norm = probabilidades_filtradas / np.sum(probabilidades_filtradas)
+            entropia_bruta = -np.sum(probabilidades_norm * np.log(probabilidades_norm))
+            n_simbolos = len(probabilidades_filtradas)
+            if n_simbolos > 1:
+                entropia_maxima = np.log(n_simbolos)
+                entropia = entropia_bruta / entropia_maxima
+            else:
+                entropia = 0.0
+            entropia = max(0.0, min(1.0, entropia))
+        
+        # Gerar gráficos
+        nome_base = f"sinal_{id_sinal}"
+        
+        # Histograma
+        plt.figure(figsize=(12, 6))
+        chaves = sorted(frequencias.keys())
+        bars = plt.bar(
+            range(len(chaves)),
+            [frequencias[k] for k in chaves],
+            tick_label=[f"{k:03b}" for k in chaves]
+        )
+        
+        for bar in bars:
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2., height,
+                     f'{height:.2f}',
+                     ha='center', va='bottom')
+        
+        plt.xlabel("Grupos Binários (3 bits)")
+        plt.ylabel("Frequência Relativa")
+        plt.title(f"Distribuição de Padrões - {nome_base}")
+        plt.xticks(rotation=45)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        
+        caminho_histograma = f"static/{nome_base}_histograma.png"
+        plt.savefig(caminho_histograma, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        # Gráfico da sequência
+        plt.figure(figsize=(12, 6))
+        plt.plot(valores[:100], 'b-', linewidth=0.5)
+        plt.axhline(y=limiar, color='r', linestyle='--', alpha=0.7, label=f'Limiar: {limiar:.2f}')
+        plt.xlabel("Amostra")
+        plt.ylabel("Amplitude")
+        plt.title(f"Sinal EEG - {nome_base}")
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        
+        caminho_sequencia = f"static/{nome_base}_sequencia.png"
+        plt.savefig(caminho_sequencia, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return {
+            'entropia': entropia,
+            'limiar': limiar,
+            'sequencia_binaria': sequencia_binaria,
+            'grupos_binarios': grupos_binarios,
+            'palavras_decimais': palavras_decimais,
+            'frequencias': frequencias,
+            'caminho_histograma': caminho_histograma,
+            'caminho_sequencia': caminho_sequencia
+        }
+        
     except Exception as e:
-        return {'erro': f'Erro geral: {str(e)}'}
+        print(f"❌ Erro na dinâmica simbólica: {e}")
+        return None
+
+def extrair_features_manualmente(valores):
+    """
+    Extrai features manualmente dos valores para predição
+    """
+    try:
+        import numpy as np
+        
+        valores = np.array(valores)
+        
+        # Features básicas
+        features = {
+            'entropia_shannon': 0.0,  # Será calculada pela dinâmica simbólica
+            'limiar': float(np.mean(valores)),
+            'total_amostras': len(valores),
+            'total_padroes': 0,  # Será calculado
+            'padroes_unicos': 0,  # Será calculado
+            'media_valores': float(np.mean(valores)),
+            'desvio_padrao': float(np.std(valores)),
+            'variancia': float(np.var(valores)),
+            'skewness': float(calcular_skewness(valores)),
+            'kurtosis': float(calcular_kurtosis(valores)),
+            'amplitude': float(np.max(valores) - np.min(valores)),
+            'rms': float(np.sqrt(np.mean(valores**2))),
+            'proporcao_uns': 0.0,  # Será calculado
+            'transicoes': 0,  # Será calculado
+            'comprimento_sequencia': len(valores),
+            'max_frequencia': 0.0,  # Será calculado
+            'min_frequencia': 0.0,  # Será calculado
+            'std_frequencias': 0.0,  # Será calculado
+            'entropia_frequencias': 0.0  # Será calculado
+        }
+        
+        # Aplicar dinâmica simbólica para completar features
+        resultado_ds = aplicar_dinamica_simbolica_direta(valores, "temp", m=3)
+        if resultado_ds:
+            features.update({
+                'entropia_shannon': resultado_ds['entropia'],
+                'total_padroes': len(resultado_ds['palavras_decimais']),
+                'padroes_unicos': len(resultado_ds['frequencias']),
+                'proporcao_uns': resultado_ds['sequencia_binaria'].count('1') / len(resultado_ds['sequencia_binaria']),
+                'transicoes': contar_transicoes(resultado_ds['sequencia_binaria']),
+                'max_frequencia': max(resultado_ds['frequencias'].values()),
+                'min_frequencia': min(resultado_ds['frequencias'].values()),
+                'std_frequencias': float(np.std(list(resultado_ds['frequencias'].values()))),
+                'entropia_frequencias': calcular_entropia_shannon(list(resultado_ds['frequencias'].values()))
+            })
+        
+        return features
+        
+    except Exception as e:
+        print(f"❌ Erro ao extrair features: {e}")
+        return None
+
+def calcular_skewness(data):
+    """Calcula o skewness dos dados"""
+    import numpy as np
+    n = len(data)
+    if n < 3:
+        return 0.0
+    
+    mean = np.mean(data)
+    std = np.std(data)
+    if std == 0:
+        return 0.0
+    
+    skewness = (n / ((n-1) * (n-2))) * np.sum(((data - mean) / std) ** 3)
+    return skewness
+
+def calcular_kurtosis(data):
+    """Calcula o kurtosis dos dados"""
+    import numpy as np
+    n = len(data)
+    if n < 4:
+        return 0.0
+    
+    mean = np.mean(data)
+    std = np.std(data)
+    if std == 0:
+        return 0.0
+    
+    kurtosis = (n * (n+1) / ((n-1) * (n-2) * (n-3))) * np.sum(((data - mean) / std) ** 4) - (3 * (n-1)**2 / ((n-2) * (n-3)))
+    return kurtosis
+
+def contar_transicoes(sequencia):
+    """Conta o número de transições na sequência binária"""
+    if len(sequencia) < 2:
+        return 0
+    
+    transicoes = 0
+    for i in range(1, len(sequencia)):
+        if sequencia[i] != sequencia[i-1]:
+            transicoes += 1
+    
+    return transicoes
+
+def calcular_entropia_shannon(valores):
+    """Calcula a entropia de Shannon de uma lista de valores"""
+    import numpy as np
+    if len(valores) == 0:
+        return 0.0
+    
+    total = sum(valores)
+    if total == 0:
+        return 0.0
+    
+    probabilidades = [v/total for v in valores]
+    
+    entropia = 0.0
+    for p in probabilidades:
+        if p > 0:
+            entropia -= p * np.log2(p)
+    
+    return entropia
 
 @app.route("/upload")
 def pagina_upload():
@@ -465,5 +882,12 @@ def upload_eeg():
         return jsonify({'erro': f'Erro interno: {str(e)}'})
 
 if __name__ == "__main__":
+    # Mostrar configurações ao iniciar
+    config.print_config()
+    
     inicializar_classificador()
-    app.run(debug=True, port=5000)
+    app.run(
+        debug=config.FLASK_DEBUG, 
+        port=config.FLASK_PORT,
+        host=config.FLASK_HOST
+    )

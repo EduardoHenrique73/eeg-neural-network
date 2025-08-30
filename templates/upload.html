@@ -1,577 +1,516 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload de Arquivo EEG - Sistema de Análise</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        .upload-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
+{% extends "base.html" %}
+
+{% block title %}Upload de Arquivo EEG{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Estilos específicos para upload */
+    .upload-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .upload-card {
+        background: var(--white);
+        border-radius: var(--border-radius-lg);
+        padding: var(--spacing-8);
+        box-shadow: var(--shadow-lg);
+        border: 2px dashed var(--gray-300);
+        transition: var(--transition);
+        text-align: center;
+    }
+    
+    .upload-card:hover {
+        border-color: var(--primary-color);
+        transform: translateY(-2px);
+    }
+    
+    .upload-card.dragover {
+        border-color: var(--primary-color);
+        background: rgba(37, 99, 235, 0.05);
+    }
+    
+    .upload-icon {
+        font-size: 4rem;
+        color: var(--primary-color);
+        margin-bottom: var(--spacing-4);
+    }
+    
+    .upload-title {
+        font-size: var(--font-size-2xl);
+        font-weight: 700;
+        color: var(--gray-900);
+        margin-bottom: var(--spacing-2);
+    }
+    
+    .upload-description {
+        font-size: var(--font-size-lg);
+        color: var(--gray-600);
+        margin-bottom: var(--spacing-6);
+        line-height: 1.6;
+    }
+    
+    .file-input-wrapper {
+        position: relative;
+        display: inline-block;
+        margin-bottom: var(--spacing-6);
+    }
+    
+    .file-input {
+        position: absolute;
+        opacity: 0;
+        width: 100%;
+        height: 100%;
+        cursor: pointer;
+    }
+    
+    .file-input-label {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--spacing-3);
+        padding: var(--spacing-4) var(--spacing-6);
+        background: var(--primary-color);
+        color: var(--white);
+        border-radius: var(--border-radius);
+        font-weight: 600;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+    
+    .file-input-label:hover {
+        background: var(--primary-dark);
+        transform: translateY(-1px);
+    }
+    
+    .file-info {
+        background: var(--gray-50);
+        border: 1px solid var(--gray-200);
+        border-radius: var(--border-radius);
+        padding: var(--spacing-4);
+        margin-top: var(--spacing-4);
+        display: none;
+    }
+    
+    .file-info.show {
+        display: block;
+    }
+    
+    .file-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: var(--spacing-3);
+        margin-top: var(--spacing-3);
+    }
+    
+    .file-detail {
+        text-align: center;
+    }
+    
+    .file-detail-label {
+        font-size: var(--font-size-sm);
+        color: var(--gray-600);
+        margin-bottom: var(--spacing-1);
+    }
+    
+    .file-detail-value {
+        font-weight: 600;
+        color: var(--gray-900);
+    }
+    
+    .upload-form {
+        margin-top: var(--spacing-6);
+    }
+    
+    .form-group {
+        margin-bottom: var(--spacing-4);
+    }
+    
+    .form-label {
+        display: block;
+        font-weight: 600;
+        color: var(--gray-700);
+        margin-bottom: var(--spacing-2);
+    }
+    
+    .form-select {
+        width: 100%;
+        padding: var(--spacing-3);
+        border: 1px solid var(--gray-300);
+        border-radius: var(--border-radius);
+        background: var(--white);
+        font-size: var(--font-size-base);
+        transition: var(--transition);
+    }
+    
+    .form-select:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    
+    .upload-actions {
+        display: flex;
+        gap: var(--spacing-4);
+        justify-content: center;
+        margin-top: var(--spacing-6);
+        flex-wrap: wrap;
+    }
+    
+    .progress-container {
+        background: var(--gray-100);
+        border-radius: var(--border-radius);
+        padding: var(--spacing-4);
+        margin-top: var(--spacing-4);
+        display: none;
+    }
+    
+    .progress-container.show {
+        display: block;
+    }
+    
+    .progress-bar {
+        width: 100%;
+        height: 8px;
+        background: var(--gray-200);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary-color), var(--primary-light));
+        width: 0%;
+        transition: width 0.3s ease;
+    }
+    
+    .progress-text {
+        text-align: center;
+        margin-top: var(--spacing-2);
+        font-size: var(--font-size-sm);
+        color: var(--gray-600);
+    }
+    
+    /* Instruções */
+    .instructions-section {
+        background: var(--white);
+        border-radius: var(--border-radius-lg);
+        padding: var(--spacing-6);
+        box-shadow: var(--shadow);
+        margin-top: var(--spacing-6);
+    }
+    
+    .instructions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: var(--spacing-6);
+    }
+    
+    .instruction-item {
+        text-align: center;
+        padding: var(--spacing-4);
+    }
+    
+    .instruction-icon {
+        font-size: var(--font-size-3xl);
+        color: var(--primary-color);
+        margin-bottom: var(--spacing-3);
+    }
+    
+    .instruction-title {
+        font-size: var(--font-size-lg);
+        font-weight: 600;
+        color: var(--gray-900);
+        margin-bottom: var(--spacing-2);
+    }
+    
+    .instruction-text {
+        font-size: var(--font-size-sm);
+        color: var(--gray-600);
+        line-height: 1.5;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="upload-container">
+    <!-- Header -->
+    <div class="text-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">
+            <i class="fas fa-upload text-primary"></i>
+            Upload de Arquivo EEG
+        </h1>
+        <p class="text-lg text-gray-600">
+            Faça upload de arquivos EEG para análise e processamento
+        </p>
+    </div>
+
+    <!-- Card de Upload -->
+    <div class="upload-card" id="uploadCard">
+        <div class="upload-icon">
+            <i class="fas fa-cloud-upload-alt"></i>
+        </div>
         
-        .upload-header {
-            text-align: center;
-            margin-bottom: 3rem;
-        }
+        <div class="upload-title">
+            Arraste e solte seu arquivo aqui
+        </div>
         
-        .upload-header h1 {
-            color: var(--primary-color);
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-        }
+        <div class="upload-description">
+            Ou clique no botão abaixo para selecionar um arquivo EEG (.txt, .csv, .mat)
+        </div>
         
-        .upload-header p {
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-        }
+        <div class="file-input-wrapper">
+            <input type="file" id="fileInput" class="file-input" accept=".txt,.csv,.mat" onchange="handleFileSelect(event)">
+            <label for="fileInput" class="file-input-label">
+                <i class="fas fa-folder-open"></i>
+                Selecionar Arquivo
+            </label>
+        </div>
         
-        .upload-section {
-            background: var(--background-light);
-            border-radius: 12px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
+        <!-- Informações do arquivo -->
+        <div class="file-info" id="fileInfo">
+            <div class="font-semibold text-gray-900 mb-2">
+                <i class="fas fa-file-alt"></i>
+                Arquivo Selecionado
+            </div>
+            <div class="file-details">
+                <div class="file-detail">
+                    <div class="file-detail-label">Nome</div>
+                    <div class="file-detail-value" id="fileName">-</div>
+                </div>
+                <div class="file-detail">
+                    <div class="file-detail-label">Tamanho</div>
+                    <div class="file-detail-value" id="fileSize">-</div>
+                </div>
+                <div class="file-detail">
+                    <div class="file-detail-label">Tipo</div>
+                    <div class="file-detail-value" id="fileType">-</div>
+                </div>
+            </div>
+        </div>
         
-        .upload-area {
-            border: 3px dashed var(--primary-color);
-            border-radius: 12px;
-            padding: 3rem;
-            text-align: center;
-            background: white;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-        
-        .upload-area:hover {
-            border-color: var(--accent-color);
-            background: #f8f9ff;
-        }
-        
-        .upload-area.dragover {
-            border-color: var(--accent-color);
-            background: #f0f4ff;
-        }
-        
-        .upload-icon {
-            font-size: 4rem;
-            color: var(--primary-color);
-            margin-bottom: 1rem;
-        }
-        
-        .upload-text {
-            font-size: 1.2rem;
-            color: var(--text-primary);
-            margin-bottom: 0.5rem;
-        }
-        
-        .upload-subtext {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-        
-        .file-input {
-            display: none;
-        }
-        
-        .upload-button {
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: 8px;
-            font-size: 1.1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-top: 1rem;
-        }
-        
-        .upload-button:hover {
-            background: var(--accent-color);
-            transform: translateY(-2px);
-        }
-        
-        .upload-button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .file-info {
-            background: white;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-top: 1rem;
-            border-left: 4px solid var(--primary-color);
-        }
-        
-        .file-name {
-            font-weight: bold;
-            color: var(--text-primary);
-        }
-        
-        .file-size {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-        
-        .processing-status {
-            background: var(--background-light);
-            border-radius: 8px;
-            padding: 1rem;
-            margin-top: 1rem;
-            text-align: center;
-        }
-        
-        .status-success {
-            border-left: 4px solid #10b981;
-            background: #f0fdf4;
-        }
-        
-        .status-error {
-            border-left: 4px solid #ef4444;
-            background: #fef2f2;
-        }
-        
-        .status-processing {
-            border-left: 4px solid #f59e0b;
-            background: #fffbeb;
-        }
-        
-        .results-section {
-            display: none;
-            margin-top: 2rem;
-        }
-        
-        .navigation-bar {
-            background: white;
-            padding: 1rem 2rem;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            margin-bottom: 2rem;
-        }
-        
-        .nav-links {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-        }
-        
-        .nav-link {
-            color: var(--primary-color);
-            text-decoration: none;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            transition: all 0.3s ease;
-        }
-        
-        .nav-link:hover {
-            background: var(--background-light);
-        }
-        
-        .nav-link.active {
-            background: var(--primary-color);
-            color: white;
-        }
-    </style>
-</head>
-<body>
-    <!-- Barra de Navegação -->
-    <div class="navigation-bar">
-        <div class="nav-links">
-            <a href="{{ url_for('home') }}" class="nav-link">
-                <i class="fas fa-home"></i>
-                Início
-            </a>
-            <a href="{{ url_for('dashboard') }}" class="nav-link">
-                <i class="fas fa-tachometer-alt"></i>
-                Dashboard
-            </a>
-            <a href="{{ url_for('pagina_testes') }}" class="nav-link">
-                <i class="fas fa-vial"></i>
-                Testes
-            </a>
-            <a href="{{ url_for('pagina_upload') }}" class="nav-link active">
-                <i class="fas fa-upload"></i>
-                Upload EEG
-            </a>
+        <!-- Progresso -->
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">Preparando upload...</div>
         </div>
     </div>
 
-    <div class="upload-container">
-        <!-- Cabeçalho -->
-        <div class="upload-header">
-            <h1><i class="fas fa-brain"></i> Upload de Arquivo EEG</h1>
-            <p>Faça upload de um arquivo de dados EEG para análise completa com dinâmica simbólica e machine learning</p>
+    <!-- Formulário de Upload -->
+    <form id="uploadForm" class="upload-form" enctype="multipart/form-data" style="display: none;">
+        <div class="form-group">
+            <label for="categoria" class="form-label">
+                <i class="fas fa-tag"></i>
+                Categoria do Sinal
+            </label>
+            <select name="categoria" id="categoria" class="form-select" required>
+                <option value="">Selecione uma categoria</option>
+                <option value="S">Grupo Sim</option>
+                <option value="N">Grupo Não</option>
+            </select>
         </div>
-
-        <!-- Seção de Upload -->
-        <div class="upload-section">
-            <h2><i class="fas fa-cloud-upload-alt"></i> Selecionar Arquivo</h2>
-            
-            <div class="upload-area" id="uploadArea">
-                <div class="upload-icon">
-                    <i class="fas fa-file-medical"></i>
-                </div>
-                <div class="upload-text">Clique ou arraste um arquivo EEG aqui</div>
-                <div class="upload-subtext">Formatos aceitos: .txt (um valor numérico por linha)</div>
-                <input type="file" id="arquivoEEG" class="file-input" accept=".txt">
-                <button class="upload-button" onclick="document.getElementById('arquivoEEG').click()">
-                    <i class="fas fa-folder-open"></i>
-                    Escolher Arquivo
-                </button>
-            </div>
-
-            <!-- Informações do arquivo -->
-            <div id="fileInfo" class="file-info" style="display: none;">
-                <div class="file-name" id="fileName"></div>
-                <div class="file-size" id="fileSize"></div>
-            </div>
-
-            <!-- Status do processamento -->
-            <div id="processingStatus" class="processing-status" style="display: none;">
-                <div id="statusText"></div>
-            </div>
-
-            <!-- Botão de processar -->
-            <button id="btnProcessar" class="upload-button" style="display: none; width: 100%; margin-top: 1rem;">
-                <i class="fas fa-cogs"></i>
-                Processar Arquivo EEG
+        
+        <div class="upload-actions">
+            <button type="button" class="btn btn-secondary" onclick="resetUpload()">
+                <i class="fas fa-times"></i>
+                Cancelar
+            </button>
+            <button type="submit" class="btn btn-primary" id="uploadBtn">
+                <i class="fas fa-upload"></i>
+                Fazer Upload
             </button>
         </div>
+    </form>
 
-        <!-- Seção de Resultados -->
-        <div id="resultadosSection" class="results-section">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-chart-line"></i>
-                        Resultados da Análise - <span id="resultadoNomeArquivo"></span>
-                    </h3>
+    <!-- Instruções -->
+    <div class="instructions-section">
+        <h2 class="text-xl font-bold mb-6 text-center">
+            <i class="fas fa-info-circle"></i>
+            Como fazer upload
+        </h2>
+        
+        <div class="instructions-grid">
+            <div class="instruction-item">
+                <div class="instruction-icon">
+                    <i class="fas fa-file-alt"></i>
                 </div>
-                <div class="card-content">
-                    <!-- Métricas -->
-                    <div class="metrics-grid">
-                        <div class="metric-card">
-                            <div class="metric-header">
-                                <div class="metric-icon entropy">
-                                    <i class="fas fa-chart-bar"></i>
-                                </div>
-                                <div>
-                                    <div class="metric-label">Entropia de Shannon</div>
-                                    <div class="metric-value" id="resultadoEntropia">-</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="metric-card">
-                            <div class="metric-header">
-                                <div class="metric-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
-                                    <i class="fas fa-shield-alt"></i>
-                                </div>
-                                <div>
-                                    <div class="metric-label">Confiança da Análise</div>
-                                    <div class="metric-value" id="resultadoConfianca">-</div>
-                                    <div class="metric-subtitle" id="resultadoConfiancaDescricao" style="font-size: 0.75rem; color: var(--text-secondary);">-</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="metric-card">
-                            <div class="metric-header">
-                                <div class="metric-icon" style="background: linear-gradient(135deg, #8b5cf6, #a855f7);">
-                                    <i class="fas fa-chart-line"></i>
-                                </div>
-                                <div>
-                                    <div class="metric-label">Limiar</div>
-                                    <div class="metric-value" id="resultadoLimiar">-</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="metric-card">
-                            <div class="metric-header">
-                                <div class="metric-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
-                                    <i class="fas fa-database"></i>
-                                </div>
-                                <div>
-                                    <div class="metric-label">Total de Amostras</div>
-                                    <div class="metric-value" id="resultadoAmostras">-</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="metric-card" id="resultadoPredicaoCard" style="display: none;">
-                            <div class="metric-header">
-                                <div class="metric-icon prediction">
-                                    <i class="fas fa-robot"></i>
-                                </div>
-                                <div>
-                                    <div class="metric-label">Predição ML</div>
-                                    <div class="prediction-badge" id="resultadoPredicao">
-                                        <i class="fas fa-question-circle"></i>
-                                        <span id="resultadoPredicaoTexto">-</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Análise Visual -->
-                    <div class="analysis-section">
-                        <div class="analysis-card">
-                            <div class="analysis-image-container">
-                                <img id="resultadoHistograma" src="" alt="Distribuição de padrões binários" class="analysis-image">
-                            </div>
-                            <div class="analysis-content">
-                                <h3 class="analysis-title">
-                                    <i class="fas fa-chart-bar"></i>
-                                    Distribuição de Padrões
-                                </h3>
-                                <p>Análise da frequência de ocorrência dos padrões binários de 3 bits no sinal EEG.</p>
-                            </div>
-                        </div>
-
-                        <div class="analysis-card">
-                            <div class="analysis-image-container">
-                                <img id="resultadoSequencia" src="" alt="Sequência temporal binária" class="analysis-image">
-                            </div>
-                            <div class="analysis-content">
-                                <h3 class="analysis-title">
-                                    <i class="fas fa-stream"></i>
-                                    Sequência Temporal
-                                </h3>
-                                <p>Variação temporal dos estados binários ao longo do tempo de aquisição do sinal.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Análise de Confiança -->
-                    <div class="confidence-section" style="margin-bottom: 2rem;">
-                        <h3 class="card-title">
-                            <i class="fas fa-shield-alt"></i>
-                            Análise de Confiança
-                        </h3>
-                        <div class="confidence-info" style="background: var(--background-light); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                            <p style="margin-bottom: 0.5rem;"><strong>Como interpretar a confiança:</strong></p>
-                            <ul style="margin: 0; padding-left: 1.5rem;">
-                                <li><strong>Baixa (30%):</strong> Sinal muito previsível, baixa complexidade - análise menos confiável</li>
-                                <li><strong>Média (60%):</strong> Sinal com complexidade moderada - análise moderadamente confiável</li>
-                                <li><strong>Alta (80%):</strong> Sinal com boa complexidade e variabilidade - análise confiável</li>
-                                <li><strong>Muito Alta (95%):</strong> Sinal muito complexo e imprevisível - análise muito confiável</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <!-- Dados Numéricos -->
-                    <div class="binary-section">
-                        <h3 class="card-title">
-                            <i class="fas fa-code"></i>
-                            Dados Numéricos
-                        </h3>
-                        
-                        <div class="binary-grid">
-                            <div>
-                                <h4 style="margin-bottom: 1rem; color: var(--text-primary);">
-                                    <i class="fas fa-list"></i>
-                                    Primeiros 20 Estados Binários
-                                </h4>
-                                <div id="resultadoSequenciaBinaria" style="background: var(--background-light); padding: 1rem; border-radius: 8px;">
-                                    <!-- Preenchido via JavaScript -->
-                                </div>
-                            </div>
-
-                            <div>
-                                <h4 style="margin-bottom: 1rem; color: var(--text-primary);">
-                                    <i class="fas fa-layer-group"></i>
-                                    Grupos de 3 Bits
-                                </h4>
-                                <div id="resultadoGruposBinarios" style="background: var(--background-light); padding: 1rem; border-radius: 8px;">
-                                    <!-- Preenchido via JavaScript -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="instruction-title">Formato do Arquivo</div>
+                <div class="instruction-text">
+                    Aceitamos arquivos .txt, .csv e .mat contendo dados de sinais EEG em formato numérico.
+                </div>
+            </div>
+            
+            <div class="instruction-item">
+                <div class="instruction-icon">
+                    <i class="fas fa-tag"></i>
+                </div>
+                <div class="instruction-title">Categorização</div>
+                <div class="instruction-text">
+                    Selecione a categoria correta do sinal: "Sim" para sinais positivos ou "Não" para sinais negativos.
+                </div>
+            </div>
+            
+            <div class="instruction-item">
+                <div class="instruction-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="instruction-title">Análise Automática</div>
+                <div class="instruction-text">
+                    Após o upload, o sistema analisará automaticamente o sinal e aplicará os modelos de IA.
+                </div>
+            </div>
+            
+            <div class="instruction-item">
+                <div class="instruction-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="instruction-title">Predições IA</div>
+                <div class="instruction-text">
+                    O sistema usará Random Forest, CNN e LSTM para fazer predições sobre o sinal.
                 </div>
             </div>
         </div>
     </div>
+</div>
+{% endblock %}
 
-    <script>
-        // Elementos da interface
-        const uploadArea = document.getElementById('uploadArea');
-        const arquivoEEG = document.getElementById('arquivoEEG');
-        const fileInfo = document.getElementById('fileInfo');
-        const fileName = document.getElementById('fileName');
-        const fileSize = document.getElementById('fileSize');
-        const processingStatus = document.getElementById('processingStatus');
-        const statusText = document.getElementById('statusText');
-        const btnProcessar = document.getElementById('btnProcessar');
-        const resultadosSection = document.getElementById('resultadosSection');
-
-        // Drag and drop
-        uploadArea.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-
-        uploadArea.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-        });
-
-        uploadArea.addEventListener('drop', function(e) {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                arquivoEEG.files = files;
-                handleFileSelect();
-            }
-        });
-
-        // Seleção de arquivo
-        arquivoEEG.addEventListener('change', handleFileSelect);
-
-        function handleFileSelect() {
-            if (arquivoEEG.files.length > 0) {
-                const arquivo = arquivoEEG.files[0];
-                
-                // Mostrar informações do arquivo
-                fileName.textContent = arquivo.name;
-                fileSize.textContent = `Tamanho: ${(arquivo.size / 1024).toFixed(2)} KB`;
-                fileInfo.style.display = 'block';
-                
-                // Mostrar botão de processar
-                btnProcessar.style.display = 'block';
-                btnProcessar.disabled = false;
-                btnProcessar.innerHTML = '<i class="fas fa-cogs"></i> Processar Arquivo EEG';
-                
-                // Limpar status anterior
-                processingStatus.style.display = 'none';
-                resultadosSection.style.display = 'none';
-            }
+{% block extra_scripts %}
+<script>
+    let selectedFile = null;
+    
+    // Drag and drop
+    const uploadCard = document.getElementById('uploadCard');
+    const fileInput = document.getElementById('fileInput');
+    
+    uploadCard.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadCard.classList.add('dragover');
+    });
+    
+    uploadCard.addEventListener('dragleave', () => {
+        uploadCard.classList.remove('dragover');
+    });
+    
+    uploadCard.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadCard.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
         }
-
-        // Processamento do arquivo
-        btnProcessar.addEventListener('click', function() {
-            if (!arquivoEEG.files.length) {
-                alert('Por favor, selecione um arquivo primeiro.');
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('arquivo', arquivoEEG.files[0]);
-
-            // Atualizar interface
-            btnProcessar.disabled = true;
-            btnProcessar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+    });
+    
+    // Seleção de arquivo
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+            handleFile(file);
+        }
+    }
+    
+    function handleFile(file) {
+        // Validar tipo de arquivo
+        const allowedTypes = ['.txt', '.csv', '.mat'];
+        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+        
+        if (!allowedTypes.includes(fileExtension)) {
+            Utils.showMessage('Tipo de arquivo não suportado. Use .txt, .csv ou .mat', 'error');
+            return;
+        }
+        
+        selectedFile = file;
+        
+        // Mostrar informações do arquivo
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileSize').textContent = formatFileSize(file.size);
+        document.getElementById('fileType').textContent = fileExtension.toUpperCase();
+        
+        document.getElementById('fileInfo').classList.add('show');
+        document.getElementById('uploadForm').style.display = 'block';
+        
+        // Scroll para o formulário
+        document.getElementById('uploadForm').scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    
+    function resetUpload() {
+        selectedFile = null;
+        fileInput.value = '';
+        document.getElementById('fileInfo').classList.remove('show');
+        document.getElementById('uploadForm').style.display = 'none';
+        document.getElementById('progressContainer').classList.remove('show');
+    }
+    
+    // Upload do formulário
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (!selectedFile) {
+            Utils.showMessage('Nenhum arquivo selecionado', 'error');
+            return;
+        }
+        
+        const categoria = document.getElementById('categoria').value;
+        if (!categoria) {
+            Utils.showMessage('Selecione uma categoria', 'error');
+            return;
+        }
+        
+        // Mostrar progresso
+        document.getElementById('progressContainer').classList.add('show');
+        document.getElementById('uploadBtn').disabled = true;
+        document.getElementById('uploadBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+        
+        // Simular progresso
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90;
             
-            // Mostrar status
-            processingStatus.style.display = 'block';
-            processingStatus.className = 'processing-status status-processing';
-            statusText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando arquivo EEG...';
-
-            // Enviar arquivo
-            fetch('/upload_eeg', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.sucesso) {
-                    // Sucesso
-                    processingStatus.className = 'processing-status status-success';
-                    statusText.innerHTML = '<i class="fas fa-check-circle"></i> Arquivo processado com sucesso!';
-                    
-                    // Exibir resultados
-                    exibirResultados(data);
-                } else {
-                    // Erro
-                    processingStatus.className = 'processing-status status-error';
-                    statusText.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Erro: ${data.erro}`;
-                    btnProcessar.disabled = false;
-                    btnProcessar.innerHTML = '<i class="fas fa-cogs"></i> Processar Arquivo EEG';
-                }
-            })
-            .catch(error => {
-                console.error('Erro:', error);
-                processingStatus.className = 'processing-status status-error';
-                statusText.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Erro de conexão. Tente novamente.';
-                btnProcessar.disabled = false;
-                btnProcessar.innerHTML = '<i class="fas fa-cogs"></i> Processar Arquivo EEG';
-            });
-        });
-
-        // Função para exibir resultados
-        function exibirResultados(data) {
-            // Atualizar métricas
-            document.getElementById('resultadoNomeArquivo').textContent = data.nome_arquivo;
-            document.getElementById('resultadoEntropia').textContent = data.entropia.toFixed(4);
-            document.getElementById('resultadoLimiar').textContent = data.limiar.toFixed(2);
-            document.getElementById('resultadoAmostras').textContent = data.total_amostras;
+            document.getElementById('progressFill').style.width = progress + '%';
+            document.getElementById('progressText').textContent = `Enviando... ${Math.round(progress)}%`;
+        }, 200);
+        
+        // Criar FormData
+        const formData = new FormData();
+        formData.append('arquivo', selectedFile);
+        formData.append('categoria', categoria);
+        
+        // Fazer upload
+        fetch('/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            clearInterval(progressInterval);
+            document.getElementById('progressFill').style.width = '100%';
+            document.getElementById('progressText').textContent = 'Upload concluído!';
             
-            // Atualizar confiança
-            document.getElementById('resultadoConfianca').textContent = `${data.confianca} (${data.confianca_porcentagem}%)`;
-            document.getElementById('resultadoConfiancaDescricao').textContent = data.confianca_descricao;
-
-            // Atualizar imagens
-            document.getElementById('resultadoHistograma').src = data.url_histograma;
-            document.getElementById('resultadoSequencia').src = data.url_sequencia;
-
-            // Atualizar sequência binária
-            const sequenciaBinariaDiv = document.getElementById('resultadoSequenciaBinaria');
-            sequenciaBinariaDiv.innerHTML = '';
-            data.sequencia_binaria.forEach(bit => {
-                const span = document.createElement('span');
-                span.className = 'binary-group';
-                span.textContent = bit;
-                sequenciaBinariaDiv.appendChild(span);
-            });
-
-            // Atualizar grupos binários
-            const gruposBinariosDiv = document.getElementById('resultadoGruposBinarios');
-            gruposBinariosDiv.innerHTML = '';
-            data.grupos_binarios.forEach(grupo => {
-                const span = document.createElement('span');
-                span.className = 'binary-group';
-                span.textContent = grupo;
-                gruposBinariosDiv.appendChild(span);
-            });
-
-            // Atualizar predição se disponível
-            if (data.predicao) {
-                document.getElementById('resultadoPredicaoCard').style.display = 'block';
-                const predicaoTexto = document.getElementById('resultadoPredicaoTexto');
-                const resultadoPredicao = document.getElementById('resultadoPredicao');
-                
-                predicaoTexto.textContent = data.predicao.classe_predita;
-                
-                if (data.predicao.classe_predita === 'Sim') {
-                    resultadoPredicao.className = 'prediction-badge prediction-sim';
-                    resultadoPredicao.innerHTML = '<i class="fas fa-check-circle"></i> ' + data.predicao.classe_predita;
-                } else {
-                    resultadoPredicao.className = 'prediction-badge prediction-nao';
-                    resultadoPredicao.innerHTML = '<i class="fas fa-times-circle"></i> ' + data.predicao.classe_predita;
-                }
+            if (data.success) {
+                Utils.showMessage('Arquivo enviado com sucesso!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1500);
             } else {
-                document.getElementById('resultadoPredicaoCard').style.display = 'none';
+                Utils.showMessage(data.error || 'Erro no upload', 'error');
+                resetUpload();
             }
-
-            // Exibir seção de resultados
-            resultadosSection.style.display = 'block';
-            
-            // Scroll para os resultados
-            resultadosSection.scrollIntoView({ behavior: 'smooth' });
-
-            // Resetar interface
-            btnProcessar.disabled = false;
-            btnProcessar.innerHTML = '<i class="fas fa-cogs"></i> Processar Arquivo EEG';
-        }
-    </script>
-</body>
-</html>
-
+        })
+        .catch(error => {
+            clearInterval(progressInterval);
+            Utils.showMessage('Erro na conexão', 'error');
+            resetUpload();
+        });
+    });
+</script>
+{% endblock %}

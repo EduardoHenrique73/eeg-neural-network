@@ -5,6 +5,7 @@ Script para verificar a estrutura dos dados no banco de dados
 
 import psycopg2
 import numpy as np
+from config import config
 
 def verificar_dados():
     """Verifica a estrutura dos dados no banco"""
@@ -12,22 +13,16 @@ def verificar_dados():
     print("=" * 50)
     
     # Conectar ao banco
-    conexao = psycopg2.connect(
-        dbname="eeg-projeto",
-        user="postgres",
-        password="EEG@321",
-        host="localhost",
-        port="5432"
-    )
+    conexao = psycopg2.connect(**config.get_db_connection_string())
     cursor = conexao.cursor()
     
     try:
         # Verificar usuários
         print("\n📊 USUÁRIOS:")
-        cursor.execute("SELECT id, nome, possui FROM usuarios ORDER BY id")
+        cursor.execute("SELECT id, possui FROM usuarios ORDER BY id")
         usuarios = cursor.fetchall()
-        for user_id, nome, possui in usuarios:
-            print(f"   ID {user_id}: {nome} - Possui: {possui}")
+        for user_id, possui in usuarios:
+            print(f"   ID {user_id}: Possui: {possui}")
         
         # Verificar sinais
         print(f"\n📈 SINAIS:")

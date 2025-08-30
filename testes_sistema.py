@@ -7,6 +7,7 @@ from datetime import datetime
 from dinamica_simbolica import aplicar_dinamica_simbolica
 from ml_classifier import EEGClassifier
 from modulo_funcoes import gerar_grafico_interativo
+from config import config
 
 class TestadorSistema:
     """Classe para executar testes completos no sistema EEG"""
@@ -24,13 +25,7 @@ class TestadorSistema:
         
     def obter_conexao_db(self):
         """Conecta ao banco de dados PostgreSQL"""
-        return psycopg2.connect(
-            dbname="eeg-projeto",
-            user="postgres",
-            password="EEG@321",
-            host="localhost",
-            port="5432"
-        )
+        return psycopg2.connect(**config.get_db_connection_string())
     
     def testar_conexao_banco(self):
         """Testa a conexão com o banco de dados"""
@@ -180,7 +175,8 @@ class TestadorSistema:
             # Teste 1: Carregar modelo existente
             self.log("  Testando carregamento de modelo...")
             try:
-                classifier.carregar_modelo()
+                from config import config
+                classifier.carregar_modelo(config.MODEL_PATH)
                 if classifier.is_trained:
                     self.log("    ✅ Modelo carregado com sucesso")
                     modelo_status = "CARREGADO"

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}EEG Neural Network{% endblock %}</title>
+
+    <!-- CSS e Fonts -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+
+    <!-- Scripts -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body>
+    <!-- Header Principal -->
+    <header class="main-header">
+      <div class="header-content">
+        <div class="logo-section">
+          <div class="logo-icon">
+            <i class="fas fa-brain"></i>
+          </div>
+          <div class="logo-text">
+            <h1>EEG Neural Network</h1>
+            <p>Análise Inteligente de Sinais Cerebrais</p>
+          </div>
+        </div>
+
+        <nav class="main-nav">
+          <a
+            href="{{ url_for('home') }}"
+            class="nav-link {% if request.endpoint == 'home' %}active{% endif %}"
+          >
+            <i class="fas fa-home"></i>
+            <span>Início</span>
+          </a>
+          <a
+            href="{{ url_for('dashboard') }}"
+            class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
+          >
+            <i class="fas fa-chart-line"></i>
+            <span>Dashboard</span>
+          </a>
+          <a
+            href="{{ url_for('pagina_upload') }}"
+            class="nav-link {% if request.endpoint == 'pagina_upload' %}active{% endif %}"
+          >
+            <i class="fas fa-upload"></i>
+            <span>Upload</span>
+          </a>
+          <a
+            href="{{ url_for('pagina_teste_ia') }}"
+            class="nav-link {% if request.endpoint == 'pagina_teste_ia' %}active{% endif %}"
+          >
+            <i class="fas fa-vial"></i>
+            <span>Teste IA</span>
+          </a>
+          <a
+            href="{{ url_for('pagina_comparador') }}"
+            class="nav-link {% if request.endpoint == 'pagina_comparador' %}active{% endif %}"
+          >
+            <i class="fas fa-balance-scale"></i>
+            <span>Comparador</span>
+          </a>
+          <a
+            href="{{ url_for('pagina_testes') }}"
+            class="nav-link {% if request.endpoint == 'pagina_testes' %}active{% endif %}"
+          >
+            <i class="fas fa-vial"></i>
+            <span>Testes</span>
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Container Principal -->
+    <main class="main-container">{% block content %}{% endblock %}</main>
+
+    <!-- Footer -->
+    <footer class="main-footer">
+      <div class="footer-content">
+        <p>
+          &copy; 2024 EEG Neural Network. Sistema de análise inteligente de
+          sinais cerebrais.
+        </p>
+      </div>
+    </footer>
+
+    <!-- Scripts Base -->
+    <script>
+      // Utilitários globais
+      const Utils = {
+        // Mostrar loading
+        showLoading: (element) => {
+          if (element) {
+            element.innerHTML = '<div class="loading-spinner"></div>';
+          }
+        },
+
+        // Mostrar mensagem
+        showMessage: (message, type = "info") => {
+          const alert = document.createElement("div");
+          alert.className = `alert alert-${type}`;
+          alert.innerHTML = `
+                    <i class="fas fa-${
+                      type === "success"
+                        ? "check-circle"
+                        : type === "error"
+                        ? "exclamation-circle"
+                        : "info-circle"
+                    }"></i>
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.remove()" class="alert-close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+          document.body.appendChild(alert);
+
+          setTimeout(() => {
+            if (alert.parentElement) {
+              alert.remove();
+            }
+          }, 5000);
+        },
+
+        // Formatar número
+        formatNumber: (num, decimals = 2) => {
+          return Number(num).toFixed(decimals);
+        },
+
+        // Formatar porcentagem
+        formatPercent: (num) => {
+          return `${(num * 100).toFixed(1)}%`;
+        },
+      };
+
+      // Auto-hide alerts
+      document.addEventListener("DOMContentLoaded", function () {
+        const alerts = document.querySelectorAll(".alert");
+        alerts.forEach((alert) => {
+          setTimeout(() => {
+            if (alert.parentElement) {
+              alert.remove();
+            }
+          }, 5000);
+        });
+      });
+    </script>
+
+    {% block extra_scripts %}{% endblock %}
+  </body>
+</html>

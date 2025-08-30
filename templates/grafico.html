@@ -1,818 +1,761 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EEG Visualizer Pro - Análise Científica de Sinais Cerebrais</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        :root {
-            --primary-blue: #1e40af;
-            --secondary-blue: #3b82f6;
-            --accent-blue: #60a5fa;
-            --light-blue: #dbeafe;
-            --dark-blue: #1e3a8a;
-            --success-green: #10b981;
-            --warning-orange: #f59e0b;
-            --danger-red: #ef4444;
-            --surface-white: #ffffff;
-            --background-light: #f8fafc;
-            --text-primary: #1f2937;
-            --text-secondary: #6b7280;
-            --border-color: #e5e7eb;
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            --border-radius: 12px;
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: var(--text-primary);
-            line-height: 1.6;
-            min-height: 100vh;
-        }
-
-        /* Header Principal */
-        .main-header {
-            background: var(--surface-white);
-            box-shadow: var(--shadow-lg);
-            padding: 1.5rem 2rem;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo-section {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .logo-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.5rem;
-        }
-
-        .logo-text h1 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 0.25rem;
-        }
-
-        .logo-text p {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            font-weight: 500;
-        }
-
-        .header-controls {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        /* Controles */
-        .control-group {
-            display: flex;
-            gap: 0.75rem;
-            align-items: center;
-        }
-
-        .select-control {
-            padding: 0.75rem 1rem;
-            border: 2px solid var(--border-color);
-            border-radius: var(--border-radius);
-            background: var(--surface-white);
-            color: var(--text-primary);
-            font-weight: 500;
-            min-width: 180px;
-            transition: var(--transition);
-        }
-
-        .select-control:focus {
-            outline: none;
-            border-color: var(--secondary-blue);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: var(--border-radius);
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-decoration: none;
-        }
-
-        .btn-primary {
-            background: var(--primary-blue);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: var(--dark-blue);
-            transform: translateY(-1px);
-        }
-
-        .btn-secondary {
-            background: var(--light-blue);
-            color: var(--primary-blue);
-        }
-
-        .btn-secondary:hover {
-            background: var(--accent-blue);
-            color: white;
-        }
-
-        /* Container Principal */
-        .main-container {
-            max-width: 1400px;
-            margin: 2rem auto;
-            padding: 0 2rem;
-        }
-
-        /* Dashboard Grid */
-        .dashboard-grid {
-            display: grid;
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        /* Cards */
-        .card {
-            background: var(--surface-white);
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow-md);
-            overflow: hidden;
-            transition: var(--transition);
-        }
-
-        .card:hover {
-            box-shadow: var(--shadow-lg);
-            transform: translateY(-2px);
-        }
-
-        .card-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-            background: linear-gradient(135deg, var(--light-blue), #eff6ff);
-        }
-
-        .card-title {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .card-content {
-            padding: 1.5rem;
-        }
-
-        /* Seção de Gráficos */
-        .graphs-section {
-            margin-bottom: 2rem;
-        }
-
-        .graph-container {
-            background: var(--surface-white);
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow-md);
-            overflow: hidden;
-        }
-
-        .graph-header {
-            padding: 1.5rem;
-            background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
-            color: white;
-        }
-
-        .graph-title {
-            font-size: 1.25rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .graph-subtitle {
-            opacity: 0.9;
-            font-size: 0.875rem;
-        }
-
-        .graph-navigation {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            padding: 1.5rem;
-            background: var(--background-light);
-        }
-
-        .plot-wrapper {
-            padding: 1rem;
-            min-height: 400px;
-            width: 100%;
-        }
-
-        .plot-container {
-            width: 100%;
-            height: 400px;
-        }
-
-        /* Métricas */
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .metric-card {
-            background: var(--surface-white);
-            border-radius: var(--border-radius);
-            padding: 1.5rem;
-            box-shadow: var(--shadow-sm);
-            border-left: 4px solid var(--primary-blue);
-        }
-
-        .metric-header {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-        }
-
-        .metric-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.125rem;
-        }
-
-        .metric-icon.entropy {
-            background: linear-gradient(135deg, #f59e0b, #f97316);
-        }
-
-        .metric-icon.prediction {
-            background: linear-gradient(135deg, var(--success-green), #059669);
-        }
-
-        .metric-icon.confidence {
-            background: linear-gradient(135deg, var(--secondary-blue), var(--primary-blue));
-        }
-
-        .metric-label {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            font-weight: 500;
-        }
-
-        .metric-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            font-family: 'Courier New', monospace;
-        }
-
-        .prediction-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.875rem;
-        }
-
-        .prediction-sim {
-            background: rgba(16, 185, 129, 0.1);
-            color: var(--success-green);
-            border: 2px solid var(--success-green);
-        }
-
-        .prediction-nao {
-            background: rgba(239, 68, 68, 0.1);
-            color: var(--danger-red);
-            border: 2px solid var(--danger-red);
-        }
-
-        /* Análise Detalhada */
-        .analysis-section {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .analysis-card {
-            background: var(--surface-white);
-            border-radius: var(--border-radius);
-            overflow: hidden;
-            box-shadow: var(--shadow-md);
-        }
-
-        .analysis-image-container {
-            width: 100%;
-            height: 300px;
-            overflow: hidden;
-            position: relative;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .analysis-image {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            background: var(--background-light);
-        }
-
-        .analysis-content {
-            padding: 1.5rem;
-        }
-
-        .analysis-title {
-            font-size: 1.125rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: var(--text-primary);
-        }
-
-        /* Sequências Binárias */
-        .binary-section {
-            background: var(--surface-white);
-            border-radius: var(--border-radius);
-            padding: 1.5rem;
-            box-shadow: var(--shadow-md);
-            margin-bottom: 2rem;
-        }
-
-        .binary-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-        }
-
-        .binary-group {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.25rem 0.5rem;
-            margin: 0.125rem;
-            background: var(--light-blue);
-            border-radius: 4px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--primary-blue);
-        }
-
-        /* Responsividade */
-        @media (max-width: 1024px) {
-            .analysis-section {
-                grid-template-columns: 1fr;
-            }
-            
-            .binary-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .header-content {
-                flex-direction: column;
-                gap: 1rem;
-            }
-            
-            .header-controls {
-                width: 100%;
-                flex-direction: column;
-            }
-            
-            .control-group {
-                width: 100%;
-                flex-direction: column;
-            }
-            
-            .select-control {
-                width: 100%;
-            }
-            
-            .main-container {
-                padding: 0 1rem;
-            }
-            
-            .metrics-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .analysis-image-container {
-                height: 200px;
-            }
-        }
-
-        /* Animações */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .fade-in-up {
-            animation: fadeInUp 0.6s ease-out;
-        }
-
-        /* Estados vazios */
-        .empty-state {
-            text-align: center;
-            padding: 3rem;
-            color: var(--text-secondary);
-        }
-
-        .empty-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-
-        /* Melhorias nos gráficos Plotly */
-        .plotly-graph-div {
-            width: 100% !important;
-            height: 400px !important;
-        }
-
-        /* Loading state */
-        .loading {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 400px;
-            background: var(--background-light);
-            border-radius: var(--border-radius);
-        }
-
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid var(--light-blue);
-            border-top: 4px solid var(--primary-blue);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { 
-                transform: rotate(0deg); 
-            }
-            100% { 
-                transform: rotate(360deg); 
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Header Principal -->
-    <header class="main-header">
-        <div class="header-content">
-            <div class="logo-section">
-                <div class="logo-icon">
-                    <i class="fas fa-brain"></i>
-                </div>
-                <div class="logo-text">
-                    <h1>EEG Visualizer Pro</h1>
-                    <p>Análise Científica de Sinais Cerebrais</p>
-                </div>
-            </div>
-            
-            <div class="header-controls">
-                <div class="control-group">
-                    <form action="{{ url_for('home') }}" method="GET" style="display: flex; gap: 0.75rem;">
-                        <select class="select-control" name="categoria" onchange="this.form.submit()">
-                            <option value="">Todos os Sinais</option>
-                            <option value="S" {% if categoria == 'S' %}selected{% endif %}>Grupo Sim</option>
-                            <option value="N" {% if categoria == 'N' %}selected{% endif %}>Grupo Não</option>
-                        </select>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-filter"></i>
-                            Filtrar
-                        </button>
-                    </form>
-                </div>
-                
-                <div class="control-group">
-                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
-                        <i class="fas fa-tachometer-alt"></i>
-                        Dashboard
-                    </a>
-                    
-                    <a href="{{ url_for('pagina_testes') }}" class="btn btn-secondary">
-                        <i class="fas fa-vial"></i>
-                        Testes
-                    </a>
-                    
-                    <a href="{{ url_for('pagina_upload') }}" class="btn btn-secondary">
-                        <i class="fas fa-upload"></i>
-                        Upload EEG
-                    </a>
-                    
-                    <form action="{{ url_for('retreinar') }}" method="POST" style="display: inline;">
-                        <button type="submit" class="btn btn-secondary">
-                            <i class="fas fa-brain"></i>
-                            Retreinar ML
-                        </button>
-                    </form>
-                </div>
-                
-
-            </div>
+{% extends "base.html" %} {% block title %}Análise de Sinais EEG - EEG
+Visualizer Pro{% endblock %} {% block extra_head %}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<style>
+  /* Estilos específicos para análise de sinais */
+  .signal-header {
+    background: linear-gradient(
+      135deg,
+      var(--primary-color),
+      var(--primary-light)
+    );
+    color: var(--white);
+    padding: var(--spacing-8);
+    border-radius: var(--border-radius-lg);
+    margin-bottom: var(--spacing-6);
+  }
+
+  .signal-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-4);
+    margin-top: var(--spacing-4);
+  }
+
+  .info-item {
+    background: rgba(255, 255, 255, 0.1);
+    padding: var(--spacing-3);
+    border-radius: var(--border-radius);
+    text-align: center;
+  }
+
+  .info-label {
+    font-size: var(--font-size-sm);
+    opacity: 0.8;
+    margin-bottom: var(--spacing-1);
+  }
+
+  .info-value {
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+  }
+
+  /* Gráficos */
+  .chart-container {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-6);
+    box-shadow: var(--shadow);
+    margin-bottom: var(--spacing-6);
+  }
+
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-4);
+    flex-wrap: wrap;
+    gap: var(--spacing-4);
+  }
+
+  .chart-title {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--gray-900);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+  }
+
+  .chart-controls {
+    display: flex;
+    gap: var(--spacing-2);
+    flex-wrap: wrap;
+  }
+
+  .chart-btn {
+    padding: var(--spacing-2) var(--spacing-3);
+    border: 1px solid var(--gray-300);
+    background: var(--white);
+    color: var(--gray-700);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: var(--font-size-sm);
+  }
+
+  .chart-btn:hover,
+  .chart-btn.active {
+    background: var(--primary-color);
+    color: var(--white);
+    border-color: var(--primary-color);
+  }
+
+  /* Métricas */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--spacing-6);
+    margin-bottom: var(--spacing-6);
+  }
+
+  .metric-card {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-6);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--gray-200);
+    transition: var(--transition);
+  }
+
+  .metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .metric-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    margin-bottom: var(--spacing-4);
+  }
+
+  .metric-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--border-radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-xl);
+    color: var(--white);
+  }
+
+  .metric-icon.entropy {
+    background: linear-gradient(135deg, #10b981, #059669);
+  }
+  .metric-icon.complexity {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+  }
+  .metric-icon.prediction {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+  }
+  .metric-icon.features {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  }
+
+  .metric-label {
+    font-size: var(--font-size-sm);
+    color: var(--gray-600);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .metric-value {
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: var(--spacing-2);
+  }
+
+  .metric-description {
+    font-size: var(--font-size-sm);
+    color: var(--gray-600);
+    line-height: 1.5;
+  }
+
+  /* Predições */
+  .predictions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-4);
+    margin-top: var(--spacing-4);
+  }
+
+  .prediction-item {
+    background: var(--gray-50);
+    padding: var(--spacing-4);
+    border-radius: var(--border-radius);
+    text-align: center;
+    border: 1px solid var(--gray-200);
+  }
+
+  .prediction-label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: var(--spacing-2);
+  }
+
+  .prediction-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    padding: var(--spacing-2) var(--spacing-3);
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-2);
+  }
+
+  .prediction-badge.prediction-sim {
+    background: rgba(16, 185, 129, 0.1);
+    color: #065f46;
+  }
+
+  .prediction-badge.prediction-nao {
+    background: rgba(239, 68, 68, 0.1);
+    color: #991b1b;
+  }
+
+  /* Sinais Grid */
+  .signals-container {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-6);
+    box-shadow: var(--shadow);
+    margin-bottom: var(--spacing-6);
+  }
+
+  .signals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-4);
+    margin-top: var(--spacing-4);
+  }
+
+  .signal-card {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-4);
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .signal-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .signal-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-3);
+    padding-bottom: var(--spacing-3);
+    border-bottom: 1px solid var(--gray-200);
+  }
+
+  .signal-name {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--gray-900);
+    margin: 0;
+  }
+
+  .signal-category {
+    padding: var(--spacing-1) var(--spacing-2);
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--white);
+  }
+
+  .signal-category.category-s {
+    background: var(--success-color);
+  }
+
+  .signal-category.category-n {
+    background: var(--danger-color);
+  }
+
+  .signal-metrics {
+    margin-bottom: var(--spacing-3);
+  }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-2);
+  }
+
+  .metric-row .metric-label {
+    font-size: var(--font-size-sm);
+    color: var(--gray-600);
+    font-weight: 500;
+  }
+
+  .metric-row .metric-value {
+    font-size: var(--font-size-sm);
+    color: var(--gray-900);
+    font-weight: 600;
+  }
+
+  .predictions-section h4 {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: var(--spacing-2);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .prediction-confidence {
+    font-size: var(--font-size-sm);
+    color: var(--gray-600);
+    font-weight: 500;
+  }
+
+  /* Ações */
+  .actions-section {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-6);
+    box-shadow: var(--shadow);
+    margin-top: var(--spacing-6);
+  }
+
+  .actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-4);
+  }
+
+  .action-card {
+    background: var(--gray-50);
+    padding: var(--spacing-4);
+    border-radius: var(--border-radius);
+    text-align: center;
+    border: 1px solid var(--gray-200);
+    transition: var(--transition);
+  }
+
+  .action-card:hover {
+    background: var(--white);
+    box-shadow: var(--shadow-md);
+  }
+
+  .action-icon {
+    font-size: var(--font-size-2xl);
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-3);
+  }
+
+  .action-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: var(--spacing-2);
+  }
+
+  .action-description {
+    font-size: var(--font-size-sm);
+    color: var(--gray-600);
+    margin-bottom: var(--spacing-4);
+  }
+
+  .no-signals {
+    text-align: center;
+    padding: var(--spacing-8);
+    color: var(--gray-600);
+    font-size: var(--font-size-lg);
+  }
+
+  /* Gráficos Interativos */
+  .graphs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: var(--spacing-6);
+    margin-top: var(--spacing-4);
+  }
+
+  .graph-item {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-4);
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
+  }
+
+  .graph-item:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .graph-container {
+    width: 100%;
+    height: 400px;
+    overflow: hidden;
+  }
+
+  .graph-container .js-plotly-plot {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Imagens da Dinâmica Simbólica */
+  .symbolic-images {
+    margin: var(--spacing-4) 0;
+    padding: var(--spacing-3);
+    background: var(--gray-50);
+    border-radius: var(--border-radius);
+  }
+
+  .image-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-3);
+  }
+
+  .image-item {
+    text-align: center;
+  }
+
+  .image-item h5 {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: var(--spacing-2);
+  }
+
+  .symbolic-img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--gray-200);
+  }
+</style>
+{% endblock %} {% block content %}
+<!-- Header Principal -->
+<div class="signal-header">
+  <div class="flex items-center gap-4">
+    <div class="logo-icon">
+      <i class="fas fa-brain"></i>
+    </div>
+    <div>
+      <h1 class="text-2xl font-bold mb-2">Análise de Sinais EEG</h1>
+      <p class="opacity-90">Visualização e análise de múltiplos sinais EEG</p>
+    </div>
+  </div>
+
+  <div class="signal-info">
+    <div class="info-item">
+      <div class="info-label">Total de Sinais</div>
+      <div class="info-value">
+        {{ histogramas|length if histogramas else 0 }}
+      </div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">Categoria Filtrada</div>
+      <div class="info-value">{{ categoria or 'Todas' }}</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">Modelos Treinados</div>
+      <div class="info-value">Random Forest + MLP + LSTM</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">Status</div>
+      <div class="info-value">Ativo</div>
+    </div>
+  </div>
+</div>
+
+<!-- Lista de Sinais -->
+<div class="signals-container">
+  <div class="chart-header">
+    <div class="chart-title">
+      <i class="fas fa-signal"></i>
+      Sinais EEG Analisados
+    </div>
+    <div class="chart-controls">
+      <button class="chart-btn active" onclick="filterSignals('all')">
+        Todos
+      </button>
+      <button class="chart-btn" onclick="filterSignals('S')">
+        Categoria S
+      </button>
+      <button class="chart-btn" onclick="filterSignals('N')">
+        Categoria N
+      </button>
+    </div>
+  </div>
+
+  <div class="signals-grid">
+    {% if histogramas %} {% for hist in histogramas %}
+    <div
+      class="signal-card"
+      data-category="{{ hist.nome[0].upper() if hist.nome else 'N' }}"
+    >
+      <div class="signal-card-header">
+        <h3 class="signal-name">{{ hist.nome }}</h3>
+        <div
+          class="signal-category {{ 'category-s' if hist.nome and hist.nome[0].upper() == 'S' else 'category-n' }}"
+        >
+          {{ hist.nome[0].upper() if hist.nome else 'N' }}
         </div>
-    </header>
+      </div>
 
-    <!-- Container Principal -->
-    <main class="main-container">
-        <!-- Seção de Gráficos -->
-        {% if graficos_html %}
-        <section class="graphs-section fade-in-up">
-            <div class="graph-container">
-                <div class="graph-header">
-                    <h2 class="graph-title">
-                        <i class="fas fa-chart-line"></i>
-                        Visualização de Sinais EEG
-                    </h2>
-                    <p class="graph-subtitle">Análise temporal dos sinais cerebrais com navegação interativa</p>
-                </div>
-                
-                <div id="graphs-container">
-                    {% for html in graficos_html %}
-                        <div class="plot-wrapper" style="display: {% if loop.first %}block{% else %}none{% endif %};">
-                            {{ html|safe }}
-                        </div>
-                    {% endfor %}
-                </div>
-                
-                {% if graficos_html|length > 1 %}
-                <div class="graph-navigation">
-                    <button class="btn btn-primary" onclick="prevGraph()">
-                        <i class="fas fa-chevron-left"></i>
-                        Anterior
-                    </button>
-                    <span id="graph-counter" style="padding: 0.75rem 1rem; background: var(--light-blue); border-radius: var(--border-radius); font-weight: 600;">
-                        1 de {{ graficos_html|length }}
-                    </span>
-                    <button class="btn btn-primary" onclick="nextGraph()">
-                        Próximo
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
-                </div>
-                {% endif %}
-            </div>
-        </section>
-        {% endif %}
-
-
-
-        <!-- Análise Detalhada por Sinal -->
-        {% for hist in histogramas %}
-        <section class="dashboard-grid fade-in-up">
-            <!-- Métricas Principais -->
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-header">
-                        <div class="metric-icon entropy">
-                            <i class="fas fa-chart-bar"></i>
-                        </div>
-                        <div>
-                            <div class="metric-label">Entropia de Shannon</div>
-                            <div class="metric-value">{{ hist.entropia }}</div>
-                        </div>
-                    </div>
-                </div>
-
-                {% if hist.predicao %}
-                <div class="metric-card">
-                    <div class="metric-header">
-                        <div class="metric-icon prediction">
-                            <i class="fas fa-robot"></i>
-                        </div>
-                        <div>
-                            <div class="metric-label">Predição ML</div>
-                            <div class="prediction-badge {% if hist.predicao.classe_predita == 'Sim' %}prediction-sim{% else %}prediction-nao{% endif %}">
-                                <i class="fas {% if hist.predicao.classe_predita == 'Sim' %}fa-check-circle{% else %}fa-times-circle{% endif %}"></i>
-                                {{ hist.predicao.classe_predita }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="metric-card">
-                    <div class="metric-header">
-                        <div class="metric-icon confidence">
-                            <i class="fas fa-percentage"></i>
-                        </div>
-                        <div>
-                            <div class="metric-label">Confiança</div>
-                            <div class="metric-value">{{ "%.1f"|format(hist.predicao.probabilidade * 100) }}%</div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-
-                <div class="metric-card">
-                    <div class="metric-header">
-                        <div class="metric-icon" style="background: linear-gradient(135deg, #8b5cf6, #a855f7);">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                        <div>
-                            <div class="metric-label">Limiar</div>
-                            <div class="metric-value">{{ hist.limiar }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Análise Visual -->
-            <div class="analysis-section">
-                <div class="analysis-card">
-                    <div class="analysis-image-container">
-                        <img src="{{ hist.url_histograma }}" 
-                             alt="Distribuição de padrões binários" 
-                             class="analysis-image"
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                        <div class="loading" style="display: none;">
-                            <div class="spinner"></div>
-                        </div>
-                    </div>
-                    <div class="analysis-content">
-                        <h3 class="analysis-title">
-                            <i class="fas fa-chart-bar"></i>
-                            Distribuição de Padrões
-                        </h3>
-                        <p>Análise da frequência de ocorrência dos padrões binários de 3 bits no sinal EEG.</p>
-                    </div>
-                </div>
-
-                <div class="analysis-card">
-                    <div class="analysis-image-container">
-                        <img src="{{ hist.url_sequencia }}" 
-                             alt="Sequência temporal binária" 
-                             class="analysis-image"
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                        <div class="loading" style="display: none;">
-                            <div class="spinner"></div>
-                        </div>
-                    </div>
-                    <div class="analysis-content">
-                        <h3 class="analysis-title">
-                            <i class="fas fa-stream"></i>
-                            Sequência Temporal
-                        </h3>
-                        <p>Variação temporal dos estados binários ao longo do tempo de aquisição do sinal.</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Dados Numéricos -->
-            <div class="binary-section">
-                <h3 class="card-title">
-                    <i class="fas fa-code"></i>
-                    Dados Numéricos - {{ hist.nome }}
-                </h3>
-                
-                <div class="binary-grid">
-                    <div>
-                        <h4 style="margin-bottom: 1rem; color: var(--text-primary);">
-                            <i class="fas fa-list"></i>
-                            Primeiros 20 Estados Binários
-                        </h4>
-                        <div style="background: var(--background-light); padding: 1rem; border-radius: 8px;">
-                            {% for bit in hist.sequencia_binaria[:20] %}
-                                <span class="binary-group">{{ bit }}</span>
-                            {% endfor %}
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 style="margin-bottom: 1rem; color: var(--text-primary);">
-                            <i class="fas fa-layer-group"></i>
-                            Grupos de 3 Bits
-                        </h4>
-                        <div style="background: var(--background-light); padding: 1rem; border-radius: 8px;">
-                            {% for grupo in hist.grupos_binarios[:10] %}
-                                <span class="binary-group">{{ grupo }}</span>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-        {% endfor %}
-
-        {% if not histogramas %}
-        <div class="empty-state">
-            <div class="empty-icon">
-                <i class="fas fa-chart-line"></i>
-            </div>
-            <h3>Nenhum dado disponível</h3>
-            <p>Selecione uma categoria para visualizar os dados de análise.</p>
+      <div class="signal-metrics">
+        <div class="metric-row">
+          <span class="metric-label">Entropia:</span>
+          <span class="metric-value">{{ hist.entropia }}</span>
         </div>
-        {% endif %}
-    </main>
+        <div class="metric-row">
+          <span class="metric-label">Limiar:</span>
+          <span class="metric-value">{{ hist.limiar }}</span>
+        </div>
+      </div>
 
-    <script>
-        // Controle de Navegação Avançado
-        let currentGraph = 0;
-        const graphs = document.querySelectorAll('.plot-wrapper');
-        const totalGraphs = graphs.length;
-        const counter = document.getElementById('graph-counter');
+      <!-- Imagens da Dinâmica Simbólica -->
+      {% if hist.url_histograma and hist.url_histograma != '/static/' %}
+      <div class="symbolic-images">
+        <div class="image-row">
+          <div class="image-item">
+            <h5>Histograma</h5>
+            <img
+              src="{{ hist.url_histograma }}"
+              alt="Histograma"
+              class="symbolic-img"
+            />
+          </div>
+          <div class="image-item">
+            <h5>Sequência</h5>
+            <img
+              src="{{ hist.url_sequencia }}"
+              alt="Sequência"
+              class="symbolic-img"
+            />
+          </div>
+        </div>
+      </div>
+      {% endif %}
 
-        function updateNavigation() {
-            graphs.forEach((graph, index) => {
-                graph.style.display = index === currentGraph ? 'block' : 'none';
-            });
-            
-            if (counter) {
-                counter.textContent = `${currentGraph + 1} de ${totalGraphs}`;
-            }
-            
-            // Atualizar Plotly após mudança de visibilidade
-            setTimeout(() => {
-                window.dispatchEvent(new Event('resize'));
-            }, 100);
-        }
+      <div class="predictions-section">
+        <h4>Predições das IAs:</h4>
+        <div class="predictions-grid">
+          <!-- Random Forest -->
+          {% if hist.predicao %}
+          <div class="prediction-item">
+            <div class="prediction-label">Random Forest</div>
+            <div
+              class="prediction-badge {% if hist.predicao.classe_predita == 'Sim' %}prediction-sim{% else %}prediction-nao{% endif %}"
+            >
+              <i
+                class="fas {% if hist.predicao.classe_predita == 'Sim' %}fa-check-circle{% else %}fa-times-circle{% endif %}"
+              ></i>
+              {{ hist.predicao.classe_predita }}
+            </div>
+            <div class="prediction-confidence">
+              {{ "%.1f"|format(hist.predicao.probabilidade * 100) }}%
+            </div>
+          </div>
+          {% endif %}
 
-        function prevGraph() {
-            currentGraph = (currentGraph - 1 + totalGraphs) % totalGraphs;
-            updateNavigation();
-        }
+          <!-- MLP Tabular -->
+          {% if hist.predicao_cnn %}
+          <div class="prediction-item">
+            <div class="prediction-label">MLP Tabular</div>
+            <div
+              class="prediction-badge {% if hist.predicao_cnn.classe_predita == 'Sim' %}prediction-sim{% else %}prediction-nao{% endif %}"
+            >
+              <i
+                class="fas {% if hist.predicao_cnn.classe_predita == 'Sim' %}fa-check-circle{% else %}fa-times-circle{% endif %}"
+              ></i>
+              {{ hist.predicao_cnn.classe_predita }}
+            </div>
+            <div class="prediction-confidence">
+              {{ "%.1f"|format(hist.predicao_cnn.probabilidade * 100) }}%
+            </div>
+          </div>
+          {% endif %}
 
-        function nextGraph() {
-            currentGraph = (currentGraph + 1) % totalGraphs;
-            updateNavigation();
-        }
+          <!-- LSTM -->
+          {% if hist.predicao_lstm %}
+          <div class="prediction-item">
+            <div class="prediction-label">LSTM</div>
+            <div
+              class="prediction-badge {% if hist.predicao_lstm.classe_predita == 'Sim' %}prediction-sim{% else %}prediction-nao{% endif %}"
+            >
+              <i
+                class="fas {% if hist.predicao_lstm.classe_predita == 'Sim' %}fa-check-circle{% else %}fa-times-circle{% endif %}"
+              ></i>
+              {{ hist.predicao_lstm.classe_predita }}
+            </div>
+            <div class="prediction-confidence">
+              {{ "%.1f"|format(hist.predicao_lstm.probabilidade * 100) }}%
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %} {% else %}
+    <div class="no-signals">
+      <p>
+        Nenhum sinal encontrado. Faça upload de arquivos EEG para começar a
+        análise.
+      </p>
+    </div>
+    {% endif %}
+  </div>
+</div>
 
-        // Inicialização
-        if (totalGraphs > 0) {
-            updateNavigation();
-        }
+<!-- Gráficos Interativos -->
+{% if graficos_html %}
+<div class="signals-container">
+  <div class="chart-header">
+    <div class="chart-title">
+      <i class="fas fa-chart-line"></i>
+      Gráficos Interativos dos Sinais EEG
+    </div>
+    <div class="chart-controls">
+      <button class="chart-btn active" onclick="showAllGraphs()">
+        Mostrar Todos
+      </button>
+      <button class="chart-btn" onclick="hideAllGraphs()">Ocultar Todos</button>
+    </div>
+  </div>
 
-        // Animações de entrada
-        document.addEventListener('DOMContentLoaded', function() {
-            const elements = document.querySelectorAll('.fade-in-up');
-            elements.forEach((el, index) => {
-                el.style.animationDelay = `${index * 0.1}s`;
-            });
+  <div class="graphs-grid">
+    {% for grafico in graficos_html %}
+    <div class="graph-item">{{ grafico | safe }}</div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 
-            // Forçar redimensionamento dos gráficos após carregamento
-            setTimeout(() => {
-                window.dispatchEvent(new Event('resize'));
-            }, 500);
-        });
+<!-- Ações -->
+<div class="actions-section">
+  <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+    <i class="fas fa-tools"></i>
+    Ações Disponíveis
+  </h2>
 
-        // Auto-submit do filtro
-        document.querySelector('.select-control').addEventListener('change', function() {
-            this.form.submit();
-        });
+  <div class="actions-grid">
+    <div class="action-card">
+      <div class="action-icon">
+        <i class="fas fa-robot"></i>
+      </div>
+      <div class="action-title">Retreinar IAs</div>
+      <div class="action-description">
+        Retreina todos os modelos de inteligência artificial com os dados mais
+        recentes.
+      </div>
+      <form action="{{ url_for('retreinar_todos') }}" method="POST">
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-sync-alt"></i>
+          Retreinar Todas as IAs
+        </button>
+      </form>
+    </div>
 
+    <div class="action-card">
+      <div class="action-icon">
+        <i class="fas fa-balance-scale"></i>
+      </div>
+      <div class="action-title">Comparar Modelos</div>
+      <div class="action-description">
+        Compare o desempenho de diferentes modelos de IA em um teste abrangente.
+      </div>
+      <a href="{{ url_for('pagina_comparador') }}" class="btn btn-secondary">
+        <i class="fas fa-chart-bar"></i>
+        Ir para Comparador
+      </a>
+    </div>
 
-    </script>
-</body>
-</html>
+    <div class="action-card">
+      <div class="action-icon">
+        <i class="fas fa-upload"></i>
+      </div>
+      <div class="action-title">Novo Upload</div>
+      <div class="action-description">
+        Faça upload de um novo arquivo EEG para análise.
+      </div>
+      <a href="{{ url_for('pagina_upload') }}" class="btn btn-success">
+        <i class="fas fa-plus"></i>
+        Upload Novo Arquivo
+      </a>
+    </div>
+
+    <div class="action-card">
+      <div class="action-icon">
+        <i class="fas fa-home"></i>
+      </div>
+      <div class="action-title">Voltar ao Início</div>
+      <div class="action-description">
+        Retorne à página principal para ver todos os sinais.
+      </div>
+      <a href="{{ url_for('home') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i>
+        Voltar ao Início
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block extra_scripts %}
+<script>
+  // Função para filtrar sinais por categoria
+  function filterSignals(category) {
+    const signalCards = document.querySelectorAll(".signal-card");
+    const filterButtons = document.querySelectorAll(".chart-btn");
+
+    // Atualizar botões ativos
+    filterButtons.forEach((btn) => btn.classList.remove("active"));
+    event.target.classList.add("active");
+
+    // Filtrar cards
+    signalCards.forEach((card) => {
+      const cardCategory = card.getAttribute("data-category");
+
+      if (category === "all" || cardCategory === category) {
+        card.style.display = "block";
+        card.style.opacity = "1";
+      } else {
+        card.style.display = "none";
+        card.style.opacity = "0";
+      }
+    });
+  }
+
+  // Funções para controlar gráficos
+  function showAllGraphs() {
+    const graphItems = document.querySelectorAll(".graph-item");
+    graphItems.forEach((item) => {
+      item.style.display = "block";
+    });
+
+    // Atualizar botões
+    document
+      .querySelectorAll(".chart-btn")
+      .forEach((btn) => btn.classList.remove("active"));
+    event.target.classList.add("active");
+  }
+
+  function hideAllGraphs() {
+    const graphItems = document.querySelectorAll(".graph-item");
+    graphItems.forEach((item) => {
+      item.style.display = "none";
+    });
+
+    // Atualizar botões
+    document
+      .querySelectorAll(".chart-btn")
+      .forEach((btn) => btn.classList.remove("active"));
+    event.target.classList.add("active");
+  }
+
+  // Inicializar página
+  document.addEventListener("DOMContentLoaded", function () {
+    console.log("Página de análise de sinais EEG carregada!");
+
+    // Mostrar notificação de sucesso
+    if (typeof showNotification === "function") {
+      showNotification("Página carregada com sucesso!", "success");
+    }
+  });
+</script>
+{% endblock %}

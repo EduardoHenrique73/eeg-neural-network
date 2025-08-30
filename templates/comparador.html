@@ -1,0 +1,695 @@
+{% extends "base.html" %}
+
+{% block title %}Comparador de Modelos IA{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Estilos específicos para comparador */
+    .comparator-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+        color: var(--white);
+        padding: var(--spacing-8);
+        border-radius: var(--border-radius-lg);
+        margin-bottom: var(--spacing-6);
+        text-align: center;
+    }
+    
+    .comparator-title {
+        font-size: var(--font-size-3xl);
+        font-weight: 700;
+        margin-bottom: var(--spacing-4);
+    }
+    
+    .comparator-description {
+        font-size: var(--font-size-lg);
+        opacity: 0.9;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    
+    /* Modelos */
+    .models-section {
+        margin-bottom: var(--spacing-8);
+    }
+    
+    .models-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: var(--spacing-6);
+        margin-bottom: var(--spacing-6);
+    }
+    
+    .model-card {
+        background: var(--white);
+        border-radius: var(--border-radius-lg);
+        padding: var(--spacing-6);
+        box-shadow: var(--shadow);
+        border: 1px solid var(--gray-200);
+        transition: var(--transition);
+        text-align: center;
+    }
+    
+    .model-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .model-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: var(--border-radius-lg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: var(--font-size-2xl);
+        color: var(--white);
+        margin: 0 auto var(--spacing-4);
+    }
+    
+    .model-icon.random-forest { background: linear-gradient(135deg, #10b981, #059669); }
+    .model-icon.cnn { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    .model-icon.lstm { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    
+    .model-title {
+        font-size: var(--font-size-xl);
+        font-weight: 700;
+        color: var(--gray-900);
+        margin-bottom: var(--spacing-2);
+    }
+    
+    .model-description {
+        font-size: var(--font-size-sm);
+        color: var(--gray-600);
+        line-height: 1.5;
+        margin-bottom: var(--spacing-4);
+    }
+    
+    .model-features {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        text-align: left;
+    }
+    
+    .model-features li {
+        padding: var(--spacing-1) 0;
+        font-size: var(--font-size-sm);
+        color: var(--gray-700);
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-2);
+    }
+    
+    .model-features li::before {
+        content: '✓';
+        color: var(--success-color);
+        font-weight: bold;
+    }
+    
+    /* Controles */
+    .controls-section {
+        background: var(--white);
+        border-radius: var(--border-radius-lg);
+        padding: var(--spacing-6);
+        box-shadow: var(--shadow);
+        margin-bottom: var(--spacing-6);
+    }
+    
+    .controls-header {
+        text-align: center;
+        margin-bottom: var(--spacing-6);
+    }
+    
+    .controls-title {
+        font-size: var(--font-size-xl);
+        font-weight: 700;
+        color: var(--gray-900);
+        margin-bottom: var(--spacing-2);
+    }
+    
+    .controls-description {
+        font-size: var(--font-size-sm);
+        color: var(--gray-600);
+    }
+    
+    .controls-actions {
+        display: flex;
+        justify-content: center;
+        gap: var(--spacing-4);
+        flex-wrap: wrap;
+    }
+    
+    /* Status */
+    .status-section {
+        background: var(--white);
+        border-radius: var(--border-radius-lg);
+        padding: var(--spacing-6);
+        box-shadow: var(--shadow);
+        margin-bottom: var(--spacing-6);
+        display: none;
+    }
+    
+    .status-section.show {
+        display: block;
+    }
+    
+    .status-header {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-3);
+        margin-bottom: var(--spacing-4);
+    }
+    
+    .status-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: var(--font-size-lg);
+        color: var(--white);
+    }
+    
+    .status-icon.running { background: var(--warning-color); }
+    .status-icon.completed { background: var(--success-color); }
+    .status-icon.error { background: var(--error-color); }
+    
+    .status-title {
+        font-size: var(--font-size-lg);
+        font-weight: 600;
+        color: var(--gray-900);
+    }
+    
+    .status-logs {
+        background: var(--gray-50);
+        border: 1px solid var(--gray-200);
+        border-radius: var(--border-radius);
+        padding: var(--spacing-4);
+        max-height: 300px;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        font-size: var(--font-size-sm);
+        line-height: 1.4;
+    }
+    
+    .status-log-entry {
+        margin-bottom: var(--spacing-1);
+        padding: var(--spacing-1);
+        border-radius: var(--border-radius-sm);
+    }
+    
+    .status-log-entry.info { background: rgba(59, 130, 246, 0.1); }
+    .status-log-entry.success { background: rgba(16, 185, 129, 0.1); }
+    .status-log-entry.warning { background: rgba(245, 158, 11, 0.1); }
+    .status-log-entry.error { background: rgba(239, 68, 68, 0.1); }
+    
+    /* Resultados */
+    .results-section {
+        display: none;
+    }
+    
+    .results-section.show {
+        display: block;
+    }
+    
+    .results-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: var(--spacing-6);
+        margin-bottom: var(--spacing-6);
+    }
+    
+    .result-card {
+        background: var(--white);
+        border-radius: var(--border-radius-lg);
+        padding: var(--spacing-6);
+        box-shadow: var(--shadow);
+        border: 1px solid var(--gray-200);
+    }
+    
+    .result-header {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-3);
+        margin-bottom: var(--spacing-4);
+    }
+    
+    .result-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--border-radius-lg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: var(--font-size-xl);
+        color: var(--white);
+    }
+    
+    .result-title {
+        font-size: var(--font-size-lg);
+        font-weight: 600;
+        color: var(--gray-900);
+    }
+    
+    .result-metrics {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-3);
+    }
+    
+    .result-metric {
+        text-align: center;
+        padding: var(--spacing-3);
+        background: var(--gray-50);
+        border-radius: var(--border-radius);
+    }
+    
+    .result-metric-label {
+        font-size: var(--font-size-sm);
+        color: var(--gray-600);
+        margin-bottom: var(--spacing-1);
+    }
+    
+    .result-metric-value {
+        font-size: var(--font-size-xl);
+        font-weight: 700;
+        color: var(--gray-900);
+    }
+    
+    /* Gráficos */
+    .charts-section {
+        background: var(--white);
+        border-radius: var(--border-radius-lg);
+        padding: var(--spacing-6);
+        box-shadow: var(--shadow);
+    }
+    
+    .charts-header {
+        text-align: center;
+        margin-bottom: var(--spacing-6);
+    }
+    
+    .charts-title {
+        font-size: var(--font-size-xl);
+        font-weight: 700;
+        color: var(--gray-900);
+        margin-bottom: var(--spacing-2);
+    }
+    
+    .charts-description {
+        font-size: var(--font-size-sm);
+        color: var(--gray-600);
+    }
+    
+    .chart-container {
+        margin-bottom: var(--spacing-6);
+    }
+    
+    .chart-container:last-child {
+        margin-bottom: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Header do Comparador -->
+<div class="comparator-header">
+    <h1 class="comparator-title">
+        <i class="fas fa-balance-scale"></i>
+        Comparador de Modelos IA
+    </h1>
+    <p class="comparator-description">
+        Compare o desempenho de diferentes modelos de inteligência artificial 
+        para análise de sinais EEG. Execute testes abrangentes e visualize os resultados.
+    </p>
+</div>
+
+<!-- Seção de Modelos -->
+<div class="models-section">
+    <h2 class="text-2xl font-bold mb-6 text-center">
+        <i class="fas fa-robot"></i>
+        Modelos Disponíveis
+    </h2>
+    
+    <div class="models-grid">
+        <!-- Random Forest -->
+        <div class="model-card">
+            <div class="model-icon random-forest">
+                <i class="fas fa-tree"></i>
+            </div>
+            <div class="model-title">Random Forest</div>
+            <div class="model-description">
+                Algoritmo de ensemble que combina múltiplas árvores de decisão para melhor precisão e robustez.
+            </div>
+            <ul class="model-features">
+                <li>Excelente para dados tabulares</li>
+                <li>Resistente a overfitting</li>
+                <li>Interpretável</li>
+                <li>Rápido treinamento</li>
+            </ul>
+        </div>
+        
+        <!-- CNN -->
+        <div class="model-card">
+            <div class="model-icon cnn">
+                <i class="fas fa-network-wired"></i>
+            </div>
+            <div class="model-title">CNN (Rede Neural Convolucional)</div>
+            <div class="model-description">
+                Rede neural especializada em processamento de sinais temporais com camadas convolucionais.
+            </div>
+            <ul class="model-features">
+                <li>Captura padrões locais</li>
+                <li>Invariante a translação</li>
+                <li>Eficiente para sinais</li>
+                <li>Arquitetura otimizada</li>
+            </ul>
+        </div>
+        
+        <!-- LSTM -->
+        <div class="model-card">
+            <div class="model-icon lstm">
+                <i class="fas fa-stream"></i>
+            </div>
+            <div class="model-title">LSTM (Long Short-Term Memory)</div>
+            <div class="model-description">
+                Rede neural recorrente especializada em sequências temporais com memória de longo prazo.
+            </div>
+            <ul class="model-features">
+                <li>Memória de longo prazo</li>
+                <li>Ideal para sequências</li>
+                <li>Evita vanishing gradient</li>
+                <li>Captura dependências temporais</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Seção de Controles -->
+<div class="controls-section">
+    <div class="controls-header">
+        <h3 class="controls-title">
+            <i class="fas fa-play-circle"></i>
+            Executar Comparação
+        </h3>
+        <p class="controls-description">
+            Clique no botão abaixo para executar uma comparação completa de todos os modelos.
+            O processo pode levar alguns minutos.
+        </p>
+    </div>
+    
+    <div class="controls-actions">
+        <button class="btn btn-primary btn-lg" onclick="executarComparacao()" id="btnExecutar">
+            <i class="fas fa-play"></i>
+            Executar Comparação Completa
+        </button>
+        
+        <button class="btn btn-secondary btn-lg" onclick="limparResultados()" id="btnLimpar" style="display: none;">
+            <i class="fas fa-trash"></i>
+            Limpar Resultados
+        </button>
+    </div>
+</div>
+
+<!-- Seção de Status -->
+<div class="status-section" id="statusSection">
+    <div class="status-header">
+        <div class="status-icon" id="statusIcon">
+            <i class="fas fa-spinner fa-spin"></i>
+        </div>
+        <div class="status-title" id="statusTitle">Executando comparação...</div>
+    </div>
+    
+    <div class="status-logs" id="statusLogs">
+        <!-- Logs serão inseridos aqui -->
+    </div>
+</div>
+
+<!-- Seção de Resultados -->
+<div class="results-section" id="resultsSection">
+    <h2 class="text-2xl font-bold mb-6 text-center">
+        <i class="fas fa-chart-bar"></i>
+        Resultados da Comparação
+    </h2>
+    
+    <!-- Métricas dos Modelos -->
+    <div class="results-grid" id="resultsGrid">
+        <!-- Resultados serão inseridos aqui -->
+    </div>
+    
+    <!-- Gráficos -->
+    <div class="charts-section">
+        <div class="charts-header">
+            <h3 class="charts-title">
+                <i class="fas fa-chart-line"></i>
+                Gráficos de Comparação
+            </h3>
+            <p class="charts-description">
+                Visualize o desempenho dos modelos através de gráficos interativos.
+            </p>
+        </div>
+        
+        <div class="chart-container" id="metricsChart">
+            <!-- Gráfico de métricas será inserido aqui -->
+        </div>
+        
+        <div class="chart-container" id="trainingChart">
+            <!-- Gráfico de treinamento será inserido aqui -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let comparisonRunning = false;
+    
+    // Executar comparação
+    function executarComparacao() {
+        if (comparisonRunning) {
+            Utils.showMessage('Comparação já está em andamento', 'warning');
+            return;
+        }
+        
+        comparisonRunning = true;
+        
+        // Atualizar interface
+        document.getElementById('btnExecutar').disabled = true;
+        document.getElementById('btnExecutar').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Executando...';
+        
+        // Mostrar seção de status
+        document.getElementById('statusSection').classList.add('show');
+        document.getElementById('statusIcon').className = 'status-icon running';
+        document.getElementById('statusIcon').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        document.getElementById('statusTitle').textContent = 'Iniciando comparação...';
+        
+        // Limpar logs anteriores
+        document.getElementById('statusLogs').innerHTML = '';
+        
+        // Fazer requisição
+        fetch('/executar_comparacao', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'started') {
+                Utils.showMessage('Comparação iniciada com sucesso!', 'success');
+                pollStatus();
+            } else {
+                throw new Error(data.message || 'Erro ao iniciar comparação');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            Utils.showMessage('Erro ao executar comparação: ' + error.message, 'error');
+            resetInterface();
+        });
+    }
+    
+    // Polling do status
+    function pollStatus() {
+        const pollInterval = setInterval(() => {
+            fetch('/status_comparacao')
+            .then(response => response.json())
+            .then(data => {
+                updateStatus(data);
+                
+                if (data.status === 'completed') {
+                    clearInterval(pollInterval);
+                    comparisonRunning = false;
+                    showResults(data.results);
+                    resetInterface();
+                } else if (data.status === 'error') {
+                    clearInterval(pollInterval);
+                    comparisonRunning = false;
+                    Utils.showMessage('Erro na comparação: ' + data.message, 'error');
+                    resetInterface();
+                }
+            })
+            .catch(error => {
+                console.error('Erro no polling:', error);
+                clearInterval(pollInterval);
+                comparisonRunning = false;
+                Utils.showMessage('Erro ao verificar status', 'error');
+                resetInterface();
+            });
+        }, 1000);
+    }
+    
+    // Atualizar status
+    function updateStatus(data) {
+        const statusIcon = document.getElementById('statusIcon');
+        const statusTitle = document.getElementById('statusTitle');
+        const statusLogs = document.getElementById('statusLogs');
+        
+        // Atualizar ícone e título
+        if (data.status === 'running') {
+            statusIcon.className = 'status-icon running';
+            statusIcon.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            statusTitle.textContent = 'Executando comparação...';
+        } else if (data.status === 'completed') {
+            statusIcon.className = 'status-icon completed';
+            statusIcon.innerHTML = '<i class="fas fa-check"></i>';
+            statusTitle.textContent = 'Comparação concluída!';
+        } else if (data.status === 'error') {
+            statusIcon.className = 'status-icon error';
+            statusIcon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+            statusTitle.textContent = 'Erro na comparação';
+        }
+        
+        // Atualizar logs
+        if (data.logs && data.logs.length > 0) {
+            statusLogs.innerHTML = '';
+            data.logs.forEach(log => {
+                const logEntry = document.createElement('div');
+                logEntry.className = 'status-log-entry info';
+                logEntry.textContent = log;
+                statusLogs.appendChild(logEntry);
+            });
+            statusLogs.scrollTop = statusLogs.scrollHeight;
+        }
+    }
+    
+    // Mostrar resultados
+    function showResults(results) {
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsGrid = document.getElementById('resultsGrid');
+        
+        // Limpar resultados anteriores
+        resultsGrid.innerHTML = '';
+        
+        // Criar cards de resultados
+        Object.keys(results).forEach(modelName => {
+            const modelData = results[modelName];
+            const resultCard = createResultCard(modelName, modelData);
+            resultsGrid.appendChild(resultCard);
+        });
+        
+        // Mostrar seção de resultados
+        resultsSection.classList.add('show');
+        
+        // Mostrar botão limpar
+        document.getElementById('btnLimpar').style.display = 'inline-flex';
+        
+        // Criar gráficos
+        createCharts(results);
+    }
+    
+    // Criar card de resultado
+    function createResultCard(modelName, modelData) {
+        const card = document.createElement('div');
+        card.className = 'result-card';
+        
+        const iconClass = {
+            'Random Forest': 'random-forest',
+            'CNN': 'cnn',
+            'LSTM': 'lstm'
+        }[modelName] || 'random-forest';
+        
+        const icon = {
+            'Random Forest': 'fas fa-tree',
+            'CNN': 'fas fa-network-wired',
+            'LSTM': 'fas fa-stream'
+        }[modelName] || 'fas fa-robot';
+        
+        card.innerHTML = `
+            <div class="result-header">
+                <div class="result-icon ${iconClass}">
+                    <i class="${icon}"></i>
+                </div>
+                <div class="result-title">${modelName}</div>
+            </div>
+            <div class="result-metrics">
+                <div class="result-metric">
+                    <div class="result-metric-label">Acurácia</div>
+                    <div class="result-metric-value">${(modelData.accuracy * 100).toFixed(1)}%</div>
+                </div>
+                <div class="result-metric">
+                    <div class="result-metric-label">Precisão</div>
+                    <div class="result-metric-value">${(modelData.precision * 100).toFixed(1)}%</div>
+                </div>
+                <div class="result-metric">
+                    <div class="result-metric-label">Recall</div>
+                    <div class="result-metric-value">${(modelData.recall * 100).toFixed(1)}%</div>
+                </div>
+                <div class="result-metric">
+                    <div class="result-metric-label">F1-Score</div>
+                    <div class="result-metric-value">${(modelData.f1_score * 100).toFixed(1)}%</div>
+                </div>
+            </div>
+        `;
+        
+        return card;
+    }
+    
+    // Criar gráficos
+    function createCharts(results) {
+        // Gráfico de métricas
+        const metricsData = Object.keys(results).map(modelName => ({
+            x: ['Acurácia', 'Precisão', 'Recall', 'F1-Score'],
+            y: [
+                results[modelName].accuracy * 100,
+                results[modelName].precision * 100,
+                results[modelName].recall * 100,
+                results[modelName].f1_score * 100
+            ],
+            type: 'bar',
+            name: modelName,
+            marker: {
+                color: {
+                    'Random Forest': '#10b981',
+                    'CNN': '#3b82f6',
+                    'LSTM': '#8b5cf6'
+                }[modelName]
+            }
+        }));
+        
+        const metricsLayout = {
+            title: 'Comparação de Métricas por Modelo',
+            xaxis: { title: 'Métricas' },
+            yaxis: { title: 'Porcentagem (%)' },
+            barmode: 'group'
+        };
+        
+        Plotly.newPlot('metricsChart', metricsData, metricsLayout);
+    }
+    
+    // Limpar resultados
+    function limparResultados() {
+        document.getElementById('resultsSection').classList.remove('show');
+        document.getElementById('btnLimpar').style.display = 'none';
+        Utils.showMessage('Resultados limpos', 'info');
+    }
+    
+    // Resetar interface
+    function resetInterface() {
+        document.getElementById('btnExecutar').disabled = false;
+        document.getElementById('btnExecutar').innerHTML = '<i class="fas fa-play"></i> Executar Comparação Completa';
+        document.getElementById('statusSection').classList.remove('show');
+    }
+</script>
+{% endblock %}

@@ -2,17 +2,12 @@ import os
 import psycopg2
 import plotly.graph_objs as go
 import plotly.io as pio
+from config import config
 
 # Configurações do banco
 def obter_conexao_db():
     """Cria uma conexão segura com o banco de dados PostgreSQL."""
-    return psycopg2.connect(
-        dbname="eeg-projeto",
-        user="postgres",
-        password="EEG@321",
-        host="localhost",
-        port="5432"
-    )
+    return psycopg2.connect(**config.get_db_connection_string())
 
 # Inserir usuário
 def inserir_usuario(possui):

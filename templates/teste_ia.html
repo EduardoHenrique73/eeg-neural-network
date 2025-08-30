@@ -1,0 +1,625 @@
+{% extends "base.html" %} {% block title %}Teste de Precisão das IAs - EEG
+Visualizer Pro{% endblock %} {% block content %}
+<div class="container">
+  <div class="page-header">
+    <div class="header-content">
+      <div class="header-title">
+        <i class="fas fa-vial"></i>
+        <h1>Teste de Precisão das IAs</h1>
+      </div>
+      <div class="header-description">
+        Teste a precisão das inteligências artificiais com arquivos que você
+        conhece o resultado
+      </div>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <div class="test-card">
+      <div class="card-header">
+        <h3><i class="fas fa-upload"></i> Upload do Arquivo de Teste</h3>
+        <p>Selecione um arquivo EEG (.txt) e informe o resultado esperado</p>
+      </div>
+
+      <form id="testForm" enctype="multipart/form-data">
+        <div class="form-group">
+          <label for="arquivo">Arquivo EEG (.txt)</label>
+          <div class="file-upload-area" id="uploadArea">
+            <div class="upload-content">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <p>Clique ou arraste o arquivo aqui</p>
+              <span class="file-info">Apenas arquivos .txt são aceitos</span>
+            </div>
+            <input
+              type="file"
+              id="arquivo"
+              name="arquivo"
+              accept=".txt"
+              required
+            />
+          </div>
+          <div class="file-selected" id="fileSelected" style="display: none">
+            <i class="fas fa-file-alt"></i>
+            <span id="fileName"></span>
+            <button type="button" class="btn-remove" onclick="removeFile()">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="resultado_esperado">Resultado Esperado</label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input
+                type="radio"
+                name="resultado_esperado"
+                value="S"
+                required
+              />
+              <span class="radio-custom"></span>
+              <span class="radio-label">
+                <i class="fas fa-check-circle text-success"></i>
+                Sim (Possui a condição)
+              </span>
+            </label>
+            <label class="radio-option">
+              <input
+                type="radio"
+                name="resultado_esperado"
+                value="N"
+                required
+              />
+              <span class="radio-custom"></span>
+              <span class="radio-label">
+                <i class="fas fa-times-circle text-danger"></i>
+                Não (Não possui a condição)
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="testBtn">
+            <i class="fas fa-play"></i>
+            Testar Precisão das IAs
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="results-section" id="resultsSection" style="display: none">
+    <div class="results-card">
+      <div class="card-header">
+        <h3><i class="fas fa-chart-bar"></i> Resultados do Teste</h3>
+      </div>
+
+      <div class="test-summary" id="testSummary">
+        <!-- Resumo do teste será inserido aqui -->
+      </div>
+
+      <div class="predictions-grid" id="predictionsGrid">
+        <!-- Predições das IAs serão inseridas aqui -->
+      </div>
+
+      <div class="signal-analysis" id="signalAnalysis">
+        <!-- Análise do sinal será inserida aqui -->
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay" style="display: none">
+    <div class="loading-content">
+      <div class="spinner"></div>
+      <p>Testando precisão das IAs...</p>
+      <small>Isso pode levar alguns segundos</small>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block extra_head %}
+<style>
+  .test-section {
+    margin-bottom: var(--spacing-6);
+  }
+
+  .test-card {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  .card-header {
+    background: var(--primary-50);
+    padding: var(--spacing-4);
+    border-bottom: 1px solid var(--primary-100);
+  }
+
+  .card-header h3 {
+    margin: 0 0 var(--spacing-2) 0;
+    color: var(--primary-700);
+    font-size: var(--font-size-lg);
+  }
+
+  .card-header p {
+    margin: 0;
+    color: var(--primary-600);
+    font-size: var(--font-size-sm);
+  }
+
+  .test-card form {
+    padding: var(--spacing-6);
+  }
+
+  .file-upload-area {
+    border: 2px dashed var(--gray-300);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-8);
+    text-align: center;
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+  }
+
+  .file-upload-area:hover {
+    border-color: var(--primary-400);
+    background: var(--primary-50);
+  }
+
+  .file-upload-area input[type="file"] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .upload-content i {
+    font-size: 3rem;
+    color: var(--gray-400);
+    margin-bottom: var(--spacing-3);
+  }
+
+  .upload-content p {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: var(--spacing-2);
+  }
+
+  .file-info {
+    font-size: var(--font-size-sm);
+    color: var(--gray-500);
+  }
+
+  .file-selected {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    padding: var(--spacing-3);
+    background: var(--success-50);
+    border: 1px solid var(--success-200);
+    border-radius: var(--border-radius);
+    color: var(--success-700);
+  }
+
+  .btn-remove {
+    background: none;
+    border: none;
+    color: var(--success-600);
+    cursor: pointer;
+    padding: var(--spacing-1);
+    border-radius: var(--border-radius-sm);
+  }
+
+  .btn-remove:hover {
+    background: var(--success-100);
+  }
+
+  .radio-group {
+    display: flex;
+    gap: var(--spacing-4);
+    margin-top: var(--spacing-2);
+  }
+
+  .radio-option {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    cursor: pointer;
+    padding: var(--spacing-3);
+    border: 2px solid var(--gray-200);
+    border-radius: var(--border-radius);
+    transition: var(--transition);
+    flex: 1;
+  }
+
+  .radio-option:hover {
+    border-color: var(--primary-300);
+    background: var(--primary-50);
+  }
+
+  .radio-option input[type="radio"] {
+    display: none;
+  }
+
+  .radio-option input[type="radio"]:checked + .radio-custom {
+    background: var(--primary-500);
+    border-color: var(--primary-500);
+  }
+
+  .radio-option input[type="radio"]:checked + .radio-custom::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
+    background: white;
+    border-radius: 50%;
+  }
+
+  .radio-custom {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--gray-400);
+    border-radius: 50%;
+    position: relative;
+    transition: var(--transition);
+  }
+
+  .radio-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    font-weight: 500;
+  }
+
+  .results-section {
+    margin-top: var(--spacing-6);
+  }
+
+  .results-card {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  .test-summary {
+    padding: var(--spacing-4);
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+  }
+
+  .summary-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-4);
+    margin-top: var(--spacing-3);
+  }
+
+  .stat-item {
+    text-align: center;
+    padding: var(--spacing-3);
+    background: var(--white);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--gray-200);
+  }
+
+  .stat-value {
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    margin-bottom: var(--spacing-1);
+  }
+
+  .stat-label {
+    font-size: var(--font-size-sm);
+    color: var(--gray-600);
+  }
+
+  .predictions-grid {
+    padding: var(--spacing-4);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-4);
+  }
+
+  .prediction-card {
+    padding: var(--spacing-4);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--border-radius);
+    background: var(--white);
+  }
+
+  .prediction-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-3);
+  }
+
+  .prediction-name {
+    font-weight: 600;
+    font-size: var(--font-size-lg);
+  }
+
+  .prediction-result {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    margin-bottom: var(--spacing-2);
+  }
+
+  .result-badge {
+    padding: var(--spacing-1) var(--spacing-2);
+    border-radius: var(--border-radius-sm);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+  }
+
+  .result-correct {
+    background: var(--success-100);
+    color: var(--success-700);
+  }
+
+  .result-incorrect {
+    background: var(--danger-100);
+    color: var(--danger-700);
+  }
+
+  .prediction-confidence {
+    font-size: var(--font-size-sm);
+    color: var(--gray-600);
+  }
+
+  .signal-analysis {
+    padding: var(--spacing-4);
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-200);
+  }
+
+  .analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-3);
+    margin-top: var(--spacing-3);
+  }
+
+  .analysis-item {
+    text-align: center;
+    padding: var(--spacing-2);
+    background: var(--white);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--gray-200);
+  }
+
+  .loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .loading-content {
+    background: var(--white);
+    padding: var(--spacing-6);
+    border-radius: var(--border-radius-lg);
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--gray-200);
+    border-top: 4px solid var(--primary-500);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto var(--spacing-3);
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+</style>
+{% endblock %} {% block extra_scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const uploadArea = document.getElementById("uploadArea");
+    const fileInput = document.getElementById("arquivo");
+    const fileSelected = document.getElementById("fileSelected");
+    const fileName = document.getElementById("fileName");
+    const testForm = document.getElementById("testForm");
+    const loadingOverlay = document.getElementById("loadingOverlay");
+    const resultsSection = document.getElementById("resultsSection");
+
+    // Drag and drop
+    uploadArea.addEventListener("dragover", function (e) {
+      e.preventDefault();
+      uploadArea.style.borderColor = "var(--primary-400)";
+      uploadArea.style.background = "var(--primary-50)";
+    });
+
+    uploadArea.addEventListener("dragleave", function (e) {
+      e.preventDefault();
+      uploadArea.style.borderColor = "var(--gray-300)";
+      uploadArea.style.background = "transparent";
+    });
+
+    uploadArea.addEventListener("drop", function (e) {
+      e.preventDefault();
+      uploadArea.style.borderColor = "var(--gray-300)";
+      uploadArea.style.background = "transparent";
+
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        fileInput.files = files;
+        handleFileSelect();
+      }
+    });
+
+    fileInput.addEventListener("change", handleFileSelect);
+
+    function handleFileSelect() {
+      const file = fileInput.files[0];
+      if (file) {
+        fileName.textContent = file.name;
+        uploadArea.style.display = "none";
+        fileSelected.style.display = "flex";
+      }
+    }
+
+    function removeFile() {
+      fileInput.value = "";
+      uploadArea.style.display = "block";
+      fileSelected.style.display = "none";
+    }
+
+    // Form submission
+    testForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const formData = new FormData(testForm);
+
+      // Show loading
+      loadingOverlay.style.display = "flex";
+
+      fetch("/testar_arquivo", {
+        method: "POST",
+        body: formData,
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          loadingOverlay.style.display = "none";
+
+          if (data.erro) {
+            Utils.showNotification("Erro: " + data.erro, "error");
+            return;
+          }
+
+          displayResults(data);
+        })
+        .catch((error) => {
+          loadingOverlay.style.display = "none";
+          Utils.showNotification(
+            "Erro na comunicação: " + error.message,
+            "error"
+          );
+        });
+    });
+
+    function displayResults(data) {
+      const testSummary = document.getElementById("testSummary");
+      const predictionsGrid = document.getElementById("predictionsGrid");
+      const signalAnalysis = document.getElementById("signalAnalysis");
+
+      // Test summary
+      testSummary.innerHTML = `
+            <h4>Resumo do Teste</h4>
+            <p><strong>Arquivo:</strong> ${data.arquivo}</p>
+            <p><strong>Resultado Esperado:</strong> ${data.resultado_esperado}</p>
+            
+            <div class="summary-stats">
+                <div class="stat-item">
+                    <div class="stat-value">${data.estatisticas.taxa_acerto}%</div>
+                    <div class="stat-label">Taxa de Acerto</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${data.estatisticas.ias_acertaram}/${data.estatisticas.total_ias}</div>
+                    <div class="stat-label">IAs Acertaram</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${data.estatisticas.status}</div>
+                    <div class="stat-label">Status Geral</div>
+                </div>
+            </div>
+        `;
+
+      // Predictions grid
+      predictionsGrid.innerHTML = "<h4>Predições das IAs</h4>";
+
+      Object.entries(data.predicoes).forEach(([iaName, prediction]) => {
+        if (prediction.erro) {
+          predictionsGrid.innerHTML += `
+                    <div class="prediction-card">
+                        <div class="prediction-header">
+                            <div class="prediction-name">${iaName}</div>
+                            <span class="result-badge result-incorrect">Erro</span>
+                        </div>
+                        <p class="prediction-confidence">Erro: ${prediction.erro}</p>
+                    </div>
+                `;
+        } else {
+          const isCorrect = prediction.acertou;
+          predictionsGrid.innerHTML += `
+                    <div class="prediction-card">
+                        <div class="prediction-header">
+                            <div class="prediction-name">${iaName}</div>
+                            <span class="result-badge ${
+                              isCorrect ? "result-correct" : "result-incorrect"
+                            }">
+                                ${isCorrect ? "Acertou" : "Errou"}
+                            </span>
+                        </div>
+                        <div class="prediction-result">
+                            <span>Predição: <strong>${
+                              prediction.classe
+                            }</strong></span>
+                        </div>
+                        <div class="prediction-confidence">
+                            Confiança: ${(
+                              prediction.probabilidade * 100
+                            ).toFixed(1)}%
+                        </div>
+                    </div>
+                `;
+        }
+      });
+
+      // Signal analysis
+      signalAnalysis.innerHTML = `
+            <h4>Análise do Sinal</h4>
+            <div class="analysis-grid">
+                <div class="analysis-item">
+                    <div class="stat-value">${data.analise_sinal.entropia.toFixed(
+                      4
+                    )}</div>
+                    <div class="stat-label">Entropia</div>
+                </div>
+                <div class="analysis-item">
+                    <div class="stat-value">${
+                      data.analise_sinal.confianca
+                    }</div>
+                    <div class="stat-label">Confiança</div>
+                </div>
+                <div class="analysis-item">
+                    <div class="stat-value">${
+                      data.analise_sinal.total_amostras
+                    }</div>
+                    <div class="stat-label">Amostras</div>
+                </div>
+            </div>
+        `;
+
+      resultsSection.style.display = "block";
+      resultsSection.scrollIntoView({ behavior: "smooth" });
+    }
+  });
+</script>
+{% endblock %}

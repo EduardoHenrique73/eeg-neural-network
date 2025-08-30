@@ -1,13 +1,8 @@
 import psycopg2
+from config import config
 
 def criar_banco():
-    conn = psycopg2.connect(
-        dbname="eeg-projeto",
-        user="postgres",
-        password="EEG@321",
-        host="localhost",
-        port="5432"
-    )
+    conn = psycopg2.connect(**config.get_db_connection_string())
     cursor = conn.cursor()
 
     # Criação da tabela de usuários
