@@ -35,9 +35,29 @@ classifier_cnn = None
 classifier_lstm = None
 classifier_cnn_original = None  # Modelo CNN original
 
+# Cache de predições para performance
+cache_predicoes = None
+
 def obter_conexao_db():
     """Conecta ao banco de dados PostgreSQL."""
     return psycopg2.connect(**config.get_db_connection_string())
+
+def carregar_cache_predicoes():
+    """Carrega cache de predições se existir"""
+    global cache_predicoes
+    try:
+        if os.path.exists('cache_predicoes.pkl'):
+            import pickle
+            with open('cache_predicoes.pkl', 'rb') as f:
+                cache_predicoes = pickle.load(f)
+            print(f"✅ Cache carregado: {len(cache_predicoes)} predições")
+            return True
+        else:
+            print("⚠️ Cache de predições não encontrado")
+            return False
+    except Exception as e:
+        print(f"❌ Erro ao carregar cache: {e}")
+        return False
 
 def inicializar_classificador():
     """Inicializa o classificador, carregando modelo salvo ou treinando novo."""
@@ -95,106 +115,13 @@ def home():
         limite = 50
     
     try:
+        # Usar a função original que gera gráficos Plotly
         resultado = gerar_grafico_interativo(limite=limite, filtro_categoria=categoria)
         graficos_html = resultado['graficos_html']
         histogramas = []
         
-        # Criar modelos adicionais para comparação (APENAS UMA VEZ, fora do loop)
-        global classifier_cnn, classifier_lstm, classifier_cnn_original
-        
-        # Inicializar MLP Tabular se necessário (melhor para dados tabulares)
-        if classifier_cnn is None:
-                   try:
-                       print("🧠 Criando modelo MLP Tabular...")
-                       classifier_cnn = EEGClassifier()
-                       classifier_cnn.criar_modelo('mlp_tabular')
-                       
-                       # Tentar carregar MLP salvo
-                       if classifier_cnn.carregar_modelo('modelo_mlp_tabular.pkl'):
-                           print("✅ MLP Tabular carregado do arquivo salvo!")
-                       else:
-                           # Treinar novo MLP
-                           X_temp, y_temp, _ = classifier_cnn.criar_dataset(limite=20)
-                           if X_temp is not None and len(X_temp) > 0:
-                               print(f"📊 Treinando MLP Tabular com {X_temp.shape[0]} amostras...")
-                               classifier_cnn.treinar_modelo(X_temp, y_temp)
-                               classifier_cnn.salvar_modelo('modelo_mlp_tabular.pkl')
-                               print("✅ MLP Tabular treinado e salvo!")
-                           else:
-                               print("❌ Não foi possível criar dataset para MLP")
-                               classifier_cnn = None
-                   except Exception as e:
-                       print(f"❌ Erro ao criar MLP Tabular: {e}")
-                       classifier_cnn = None
-        
-        # Inicializar LSTM se necessário
-        if classifier_lstm is None:
-            try:
-                print("🧠 Criando modelo LSTM...")
-                classifier_lstm = EEGClassifier()
-                classifier_lstm.criar_modelo('lstm')
-                
-                # Tentar carregar LSTM salvo
-                if classifier_lstm.carregar_modelo('modelo_lstm.pkl'):
-                    print("✅ LSTM carregado do arquivo salvo!")
-                else:
-                    # Treinar novo LSTM
-                    X_temp, y_temp, _ = classifier_lstm.criar_dataset(limite=20)
-                    if X_temp is not None and len(X_temp) > 0:
-                        print(f"📊 Treinando LSTM com {X_temp.shape[0]} amostras...")
-                        try:
-                            classifier_lstm.treinar_modelo(X_temp, y_temp)
-                            if classifier_lstm.is_trained:
-                                classifier_lstm.salvar_modelo('modelo_lstm.pkl')
-                                print("✅ LSTM treinado e salvo!")
-                            else:
-                                print("❌ LSTM não foi treinado corretamente")
-                                classifier_lstm = None
-                        except Exception as e:
-                            print(f"❌ Erro ao treinar LSTM: {e}")
-                            classifier_lstm = None
-                    else:
-                        print("❌ Não foi possível criar dataset para LSTM")
-                        classifier_lstm = None
-            except Exception as e:
-                print(f"❌ Erro ao criar LSTM: {e}")
-                classifier_lstm = None
-        
-        # Inicializar CNN Original se necessário
-        if classifier_cnn_original is None:
-            try:
-                print("🧠 Criando modelo CNN Original...")
-                classifier_cnn_original = EEGClassifier()
-                classifier_cnn_original.criar_modelo('cnn')
-                
-                # Tentar carregar CNN salvo
-                if classifier_cnn_original.carregar_modelo('modelo_cnn.pkl'):
-                    print("✅ CNN Original carregado do arquivo salvo!")
-                else:
-                    # Treinar novo CNN
-                    X_temp, y_temp, _ = classifier_cnn_original.criar_dataset(limite=20)
-                    if X_temp is not None and len(X_temp) > 0:
-                        print(f"📊 Treinando CNN Original com {X_temp.shape[0]} amostras...")
-                        try:
-                            classifier_cnn_original.treinar_modelo(X_temp, y_temp)
-                            if classifier_cnn_original.is_trained:
-                                classifier_cnn_original.salvar_modelo('modelo_cnn.pkl')
-                                print("✅ CNN Original treinado e salvo!")
-                            else:
-                                print("❌ CNN Original não foi treinado corretamente")
-                                classifier_cnn_original = None
-                        except Exception as e:
-                            print(f"❌ Erro ao treinar CNN Original: {e}")
-                            classifier_cnn_original = None
-                    else:
-                        print("❌ Não foi possível criar dataset para CNN Original")
-                        classifier_cnn_original = None
-            except Exception as e:
-                print(f"❌ Erro ao criar CNN Original: {e}")
-                classifier_cnn_original = None
-        
-        # Processar apenas os primeiros 10 sinais para evitar sobrecarga
-        sinais_para_processar = resultado['dados_sinais'][:10]
+        # Processar sinais com o limite correto
+        sinais_para_processar = resultado['dados_sinais'][:limite]  # Usar o limite correto
         
         for sinal in sinais_para_processar:
             try:
@@ -202,36 +129,22 @@ def home():
                 if resultado_ds is None:
                     continue
                 
-                # Inicializar predições como None
+                # Fazer apenas predição do modelo principal (Random Forest) para velocidade
                 predicao = None
-                predicao_cnn = None
-                predicao_lstm = None
-                predicao_cnn_original = None
-                
-                # Fazer apenas uma predição por modelo para evitar loops
                 if classifier and classifier.is_trained:
                     try:
-                        predicao = classifier.prever_sinal(sinal['id'])
+                        predicao_raw = classifier.prever_sinal(sinal['id'])
+                        # Verificar se a predição é válida
+                        if predicao_raw and isinstance(predicao_raw, dict):
+                            predicao = predicao_raw
+                        else:
+                            predicao = None
                     except Exception as e:
-                        print(f"❌ Erro na predição Random Forest: {e}")
+                        print(f"❌ Erro na predição: {e}")
+                        predicao = None
                 
-                if classifier_cnn and classifier_cnn.is_trained:
-                    try:
-                        predicao_cnn = classifier_cnn.prever_sinal(sinal['id'])
-                    except Exception as e:
-                        print(f"❌ Erro na predição MLP Tabular: {e}")
-                
-                if classifier_lstm and classifier_lstm.is_trained:
-                    try:
-                        predicao_lstm = classifier_lstm.prever_sinal(sinal['id'])
-                    except Exception as e:
-                        print(f"❌ Erro na predição LSTM: {e}")
-                
-                if classifier_cnn_original and classifier_cnn_original.is_trained:
-                    try:
-                        predicao_cnn_original = classifier_cnn_original.prever_sinal(sinal['id'])
-                    except Exception as e:
-                        print(f"❌ Erro na predição CNN Original: {e}")
+                # Buscar predições salvas no banco de dados
+                predicoes_salvas = buscar_predicoes_banco(sinal['id'])
                 
                 # Preparar dados para o template
                 sequencia_binaria = resultado_ds.get('sequencia_binaria', [])[:20]
@@ -248,9 +161,9 @@ def home():
                     'grupos_binarios': grupos_binarios,
                     'palavras_decimais': palavras_decimais,
                     'predicao': predicao,
-                    'predicao_cnn': predicao_cnn,
-                    'predicao_lstm': predicao_lstm,
-                    'predicao_cnn_original': predicao_cnn_original
+                    'predicao_cnn': predicoes_salvas.get('mlp_tabular', "Clique em 'Retreinar' para executar"),
+                    'predicao_lstm': predicoes_salvas.get('lstm', "Clique em 'Retreinar' para executar"),
+                    'predicao_cnn_original': predicoes_salvas.get('cnn_original', "Clique em 'Retreinar' para executar")
                 })
             except Exception as e:
                 print(f"❌ Erro ao processar sinal {sinal['id']}: {e}")
@@ -328,6 +241,10 @@ def executar_retreinamento_todos_background():
         
         log_retraining("🚀 Iniciando retreinamento de todos os modelos...")
         
+        # Inicializar modelos primeiro
+        log_retraining("🔧 Inicializando modelos...")
+        inicializar_todos_modelos()
+        
         # Criar dataset
         log_retraining("📊 Criando dataset de treinamento...")
         X, y, _ = classifier.criar_dataset(limite=20)
@@ -383,7 +300,53 @@ def executar_retreinamento_todos_background():
         except Exception as e:
             log_retraining(f"❌ Erro ao treinar LSTM: {e}")
         
-        log_retraining("🎉 Todos os modelos foram retreinados com sucesso!")
+        # Após treinar, fazer predições com todos os modelos para os sinais atuais
+        log_retraining("🔮 Fazendo predições com todos os modelos...")
+        
+        # Buscar TODOS os sinais para fazer predições
+        conexao = obter_conexao_db()
+        cursor = conexao.cursor()
+        cursor.execute("""
+            SELECT s.id, s.nome
+            FROM sinais s
+            ORDER BY s.id DESC
+        """)
+        todos_sinais = cursor.fetchall()
+        cursor.close()
+        conexao.close()
+        
+        log_retraining(f"📊 Processando {len(todos_sinais)} sinais para predições...")
+        
+        # Fazer predições com todos os modelos e salvar no banco
+        total_sinais = len(todos_sinais)
+        for i, (sinal_id, nome) in enumerate(todos_sinais, 1):
+            try:
+                # Mostrar progresso a cada 10 sinais
+                if i % 10 == 0 or i == total_sinais:
+                    log_retraining(f"📈 Progresso: {i}/{total_sinais} sinais processados ({i/total_sinais*100:.1f}%)")
+                
+                # Predição com MLP Tabular
+                if classifier_cnn and classifier_cnn.is_trained:
+                    predicao_mlp = classifier_cnn.prever_sinal(sinal_id)
+                    # Salvar predição no banco
+                    salvar_predicao_banco(sinal_id, 'mlp_tabular', predicao_mlp)
+                
+                # Predição com CNN Original
+                if classifier_cnn_original and classifier_cnn_original.is_trained:
+                    predicao_cnn = classifier_cnn_original.prever_sinal(sinal_id)
+                    # Salvar predição no banco
+                    salvar_predicao_banco(sinal_id, 'cnn_original', predicao_cnn)
+                
+                # Predição com LSTM
+                if classifier_lstm and classifier_lstm.is_trained:
+                    predicao_lstm = classifier_lstm.prever_sinal(sinal_id)
+                    # Salvar predição no banco
+                    salvar_predicao_banco(sinal_id, 'lstm', predicao_lstm)
+                    
+            except Exception as e:
+                log_retraining(f"❌ Erro ao fazer predição para sinal {nome}: {e}")
+        
+        log_retraining("🎉 Todos os modelos foram retreinados e testados com sucesso!")
         retraining_status = "completed"
         
     except Exception as e:
@@ -426,7 +389,7 @@ def dashboard():
             FROM sinais s
             JOIN usuarios u ON s.idusuario = u.id
             ORDER BY s.id DESC
-            LIMIT 40
+            LIMIT 10
         """)
         sinais_amostra = cursor.fetchall()
         for sinal_id, nome, categoria in sinais_amostra:
@@ -435,43 +398,23 @@ def dashboard():
                 if resultado and 'entropia' in resultado:
                     entropias.append(resultado['entropia'])
                     
-                    # Fazer predições com todos os modelos
+                    # Fazer apenas predição do modelo principal para velocidade
                     predicao = None
-                    predicao_cnn = None
-                    predicao_lstm = None
-                    
-                    # Random Forest
                     if classifier and classifier.is_trained:
                         try:
                             predicao = classifier.prever_sinal(sinal_id)
                         except Exception:
                             pass
                     
-                    # CNN Original
-                    if classifier_cnn_original and classifier_cnn_original.is_trained:
-                        try:
-                            predicao_cnn = classifier_cnn_original.prever_sinal(sinal_id)
-                        except Exception:
-                            pass
-                    
-                    # LSTM
-                    if classifier_lstm and classifier_lstm.is_trained:
-                        try:
-                            predicao_lstm = classifier_lstm.prever_sinal(sinal_id)
-                        except Exception:
-                            pass
-                    
                     sinais_recentes.append({
-                                                'id': sinal_id,
+                        'id': sinal_id,
                         'nome_arquivo': nome,
                         'categoria': categoria,
                         'entropia': resultado['entropia'],
                         'complexidade': resultado.get('complexidade', 0.0),
                         'data_upload': datetime.now().isoformat(),  # Converter para string ISO
-                        'predicao': predicao,
-                        'predicao_cnn': predicao_cnn,
-                        'predicao_lstm': predicao_lstm
-                     })
+                        'predicao': predicao
+                    })
             except Exception:
                 continue
         if not entropias:
@@ -522,6 +465,85 @@ def dashboard():
                              entropias=entropias)
     except Exception as e:
         return render_template("erro.html", mensagem=f"Erro ao carregar dashboard: {e}")
+
+def salvar_predicao_banco(sinal_id, tipo_modelo, predicao):
+    """Salva a predição de um modelo no banco de dados"""
+    try:
+        conexao = obter_conexao_db()
+        cursor = conexao.cursor()
+        
+        # Verificar se já existe uma predição para este sinal e modelo
+        cursor.execute("""
+            SELECT id FROM predicoes_ia 
+            WHERE id_sinal = %s AND tipo_modelo = %s
+        """, (sinal_id, tipo_modelo))
+        
+        predicao_existente = cursor.fetchone()
+        
+        if predicao_existente:
+            # Atualizar predição existente
+            cursor.execute("""
+                UPDATE predicoes_ia 
+                SET classe_predita = %s, probabilidade = %s, data_predicao = NOW()
+                WHERE id_sinal = %s AND tipo_modelo = %s
+            """, (predicao['classe_predita'], predicao['probabilidade'], sinal_id, tipo_modelo))
+        else:
+            # Inserir nova predição
+            cursor.execute("""
+                INSERT INTO predicoes_ia (id_sinal, tipo_modelo, classe_predita, probabilidade, data_predicao)
+                VALUES (%s, %s, %s, %s, NOW())
+            """, (sinal_id, tipo_modelo, predicao['classe_predita'], predicao['probabilidade']))
+        
+        conexao.commit()
+        cursor.close()
+        conexao.close()
+        print(f"✅ Predição {tipo_modelo} salva para sinal {sinal_id}")
+        
+    except Exception as e:
+        print(f"❌ Erro ao salvar predição {tipo_modelo} para sinal {sinal_id}: {e}")
+
+def buscar_predicoes_banco(sinal_id):
+    """Busca todas as predições salvas no banco para um sinal"""
+    global cache_predicoes
+    
+    # Primeiro, tentar usar o cache
+    if cache_predicoes and sinal_id in cache_predicoes:
+        predicoes_cache = cache_predicoes[sinal_id]
+        # Converter para o formato esperado
+        predicoes = {}
+        for modelo, predicao in predicoes_cache.items():
+            if predicao and isinstance(predicao, dict):
+                predicoes[modelo] = {
+                    'classe_predita': predicao.get('classe_predita', ''),
+                    'probabilidade': predicao.get('probabilidade', 0.0)
+                }
+        return predicoes
+    
+    # Se não estiver no cache, buscar no banco
+    try:
+        conexao = obter_conexao_db()
+        cursor = conexao.cursor()
+        
+        cursor.execute("""
+            SELECT tipo_modelo, classe_predita, probabilidade
+            FROM predicoes_ia 
+            WHERE id_sinal = %s
+        """, (sinal_id,))
+        
+        predicoes = {}
+        for tipo_modelo, classe_predita, probabilidade in cursor.fetchall():
+            predicoes[tipo_modelo] = {
+                'classe_predita': classe_predita,
+                'probabilidade': probabilidade
+            }
+        
+        cursor.close()
+        conexao.close()
+        return predicoes
+        
+    except Exception as e:
+        print(f"❌ Erro ao buscar predições para sinal {sinal_id}: {e}")
+        return {}
 
 def executar_testes_background():
     """Executa os testes em background"""
@@ -1155,8 +1177,9 @@ def pagina_teste_precisao():
         cursor.close()
         conexao.close()
         
-        # Calcular precisão atual (implementação simples)
-        precisao = {'total': 0, 'acertos': 0, 'precisao': 0.0}
+
+        # Calcular precisão atual
+        precisao = calcular_precisao_ia()
         
         return render_template("teste_precisao.html", 
                              sinais=sinais, 
@@ -1165,11 +1188,183 @@ def pagina_teste_precisao():
         return render_template("erro.html", 
                              mensagem=f"Erro ao carregar página de teste: {e}")
 
+def calcular_precisao_ia():
+    """Calcula a precisão atual da IA baseada nos testes realizados"""
+    try:
+        conexao = obter_conexao_db()
+        cursor = conexao.cursor()
+        
+        # Buscar sinais que foram testados (com categoria real marcada)
+        cursor.execute("""
+            SELECT s.id, u.possui as categoria_real
+            FROM sinais s
+            JOIN usuarios u ON s.idusuario = u.id
+            WHERE u.possui IN ('S', 'N')
+            ORDER BY s.id DESC
+            LIMIT 100
+        """)
+        
+        sinais_testados = cursor.fetchall()
+        cursor.close()
+        conexao.close()
+        
+        if not sinais_testados:
+            return {'total': 0, 'acertos': 0, 'precisao': 0.0}
+        
+        acertos = 0
+        total = 0
+        
+        for sinal_id, categoria_real in sinais_testados:
+            try:
+                # Fazer predição da IA
+                predicao = classifier.prever_sinal(sinal_id)
+                if predicao and 'classe_predita' in predicao:
+                    classe_predita = predicao['classe_predita']
+                    
+                    # Comparar predição com categoria real
+                    if (classe_predita == 'S' and categoria_real == 'S') or \
+                       (classe_predita == 'N' and categoria_real == 'N'):
+                        acertos += 1
+                    total += 1
+            except Exception:
+                continue
+        
+        precisao = (acertos / total * 100) if total > 0 else 0.0
+        
+        return {
+            'total': total,
+            'acertos': acertos,
+            'precisao': round(precisao, 1)
+        }
+        
+    except Exception as e:
+        print(f"Erro ao calcular precisão: {e}")
+        return {'total': 0, 'acertos': 0, 'precisao': 0.0}
+
+@app.route("/predicao_sinal/<int:sinal_id>")
+def predicao_sinal(sinal_id):
+    """Rota para obter predição de um sinal específico"""
+    try:
+        # Verificar se o classificador está treinado
+        if not classifier or not classifier.is_trained:
+            return jsonify({
+                'sucesso': False,
+                'erro': 'Modelo não está treinado'
+            })
+        
+        # Fazer predição com timeout
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Predição demorou muito tempo")
+        
+        # Definir timeout de 10 segundos
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(10)
+        
+        try:
+            predicao = classifier.prever_sinal(sinal_id)
+            signal.alarm(0)  # Cancelar alarme
+            
+            if predicao:
+                return jsonify({
+                    'sucesso': True,
+                    'predicao': predicao
+                })
+            else:
+                return jsonify({
+                    'sucesso': False,
+                    'erro': 'Não foi possível fazer predição'
+                })
+        except TimeoutError:
+            signal.alarm(0)
+            return jsonify({
+                'sucesso': False,
+                'erro': 'Timeout na predição'
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'sucesso': False,
+            'erro': str(e)
+        })
+
+@app.route("/estatisticas_precisao")
+def estatisticas_precisao():
+    """Rota para obter estatísticas atualizadas de precisão"""
+    try:
+        precisao = calcular_precisao_ia()
+        return jsonify(precisao)
+    except Exception as e:
+        return jsonify({'erro': str(e)})
+
+def inicializar_todos_modelos():
+    """Inicializa todos os modelos de IA quando solicitado"""
+    global classifier_cnn, classifier_lstm, classifier_cnn_original
+    
+    print("🚀 Inicializando todos os modelos de IA...")
+    
+    # Inicializar MLP Tabular
+    try:
+        print("🧠 Inicializando MLP Tabular...")
+        classifier_cnn = EEGClassifier()
+        classifier_cnn.criar_modelo('mlp_tabular')
+        
+        if classifier_cnn.carregar_modelo('modelo_mlp_tabular.pkl'):
+            print("✅ MLP Tabular carregado!")
+        else:
+            print("⚠️ MLP Tabular não encontrado - será treinado durante retreinamento")
+            classifier_cnn = None
+    except Exception as e:
+        print(f"❌ Erro ao inicializar MLP Tabular: {e}")
+        classifier_cnn = None
+    
+    # Inicializar LSTM
+    try:
+        print("🧠 Inicializando LSTM...")
+        classifier_lstm = EEGClassifier()
+        classifier_lstm.criar_modelo('lstm')
+        
+        if classifier_lstm.carregar_modelo('modelo_lstm.pkl'):
+            print("✅ LSTM carregado!")
+        else:
+            print("⚠️ LSTM não encontrado - será treinado durante retreinamento")
+            classifier_lstm = None
+    except Exception as e:
+        print(f"❌ Erro ao inicializar LSTM: {e}")
+        classifier_lstm = None
+    
+    # Inicializar CNN Original
+    try:
+        print("🧠 Inicializando CNN Original...")
+        classifier_cnn_original = EEGClassifier()
+        classifier_cnn_original.criar_modelo('cnn')
+        
+        if classifier_cnn_original.carregar_modelo('modelo_cnn.pkl'):
+            print("✅ CNN Original carregado!")
+        else:
+            print("⚠️ CNN Original não encontrado - será treinado durante retreinamento")
+            classifier_cnn_original = None
+    except Exception as e:
+        print(f"❌ Erro ao inicializar CNN Original: {e}")
+        classifier_cnn_original = None
+    
+    print("🎉 Inicialização de modelos concluída!")
+
 if __name__ == "__main__":
     # Mostrar configurações ao iniciar
     config.print_config()
     
+    # Carregar cache de predições para performance
+    carregar_cache_predicoes()
+    
+    # Inicializar apenas o classificador principal (Random Forest)
     inicializar_classificador()
+    
+    # NÃO inicializar os outros modelos automaticamente
+    # Eles serão inicializados apenas quando o usuário clicar em "Retreinar"
+    print("🚀 Servidor iniciado! Modelos adicionais serão carregados quando necessário.")
+    
     app.run(
         debug=config.FLASK_DEBUG, 
         port=config.FLASK_PORT,

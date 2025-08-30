@@ -2,11 +2,23 @@ import os
 import numpy as np
 from collections import Counter
 import psycopg2
+
+# Configuração robusta do Matplotlib para ambiente de servidor
 import matplotlib
 matplotlib.use('Agg')  # Backend não interativo para servidores
 matplotlib.rcParams['figure.max_open_warning'] = 0  # Desabilitar avisos de figuras
+matplotlib.rcParams['figure.dpi'] = 100  # DPI mais baixo para melhor performance
+matplotlib.rcParams['savefig.dpi'] = 100
+matplotlib.rcParams['savefig.bbox'] = 'tight'
+matplotlib.rcParams['savefig.pad_inches'] = 0.1
+
 import matplotlib.pyplot as plt
 plt.ioff()  # Desabilitar modo interativo
+
+# Configurar para evitar problemas de renderer
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib')
+
 from config import config
 
 def obter_conexao_db():
@@ -77,65 +89,87 @@ def calcular_entropia_shannon(frequencias):
 
 def plotar_histograma(frequencias, nome_base):
     """Gera e salva o histograma com rótulos binários"""
-    chaves = sorted(frequencias.keys())
+    try:
+        chaves = sorted(frequencias.keys())
+        
+        # Criar figura com configurações específicas
+        fig, ax = plt.subplots(figsize=(12, 6))
+        
+        bars = ax.bar(
+            range(len(chaves)),
+            [frequencias[k] for k in chaves],
+            tick_label=[f"{k:03b}" for k in chaves]  # Formato binário de 3 bits
+        )
 
-    plt.figure(figsize=(12, 6))
-    bars = plt.bar(
-        range(len(chaves)),
-        [frequencias[k] for k in chaves],
-        tick_label=[f"{k:03b}" for k in chaves]  # Formato binário de 3 bits
-    )
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height,
+                     f'{height:.2f}',
+                     ha='center', va='bottom')
 
-    for bar in bars:
-        height = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2., height,
-                 f'{height:.2f}',
-                 ha='center', va='bottom')
-
-    plt.xlabel("Grupos Binários (3 bits)", fontsize=12)
-    plt.ylabel("Frequência Relativa", fontsize=12)
-    plt.title(f"Distribuição de Padrões - {nome_base}", fontsize=14)
-    plt.xticks(rotation=45)
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-
-    nome_arquivo = f"{nome_base}_histograma.png"
-    caminho = os.path.join("static", nome_arquivo)
-    os.makedirs(os.path.dirname(caminho), exist_ok=True)
-    plt.savefig(caminho)
-    plt.close()
-
-    return caminho
+        ax.set_xlabel("Grupos Binários (3 bits)", fontsize=12)
+        ax.set_ylabel("Frequência Relativa", fontsize=12)
+        ax.set_title(f"Distribuição de Padrões - {nome_base}", fontsize=14)
+        ax.tick_params(axis='x', rotation=45)
+        ax.grid(True, alpha=0.3)
+        
+        # Salvar figura
+        nome_arquivo = f"{nome_base}_histograma.png"
+        caminho = os.path.join("static", nome_arquivo)
+        os.makedirs(os.path.dirname(caminho), exist_ok=True)
+        
+        fig.savefig(caminho, dpi=100, bbox_inches='tight', pad_inches=0.1)
+        plt.close(fig)
+        
+        return caminho
+        
+    except Exception as e:
+        print(f"Erro ao plotar histograma para {nome_base}: {e}")
+        # Retornar caminho vazio em caso de erro
+        return ""
 
 def plotar_sequencia_binaria(sequencia, nome_base):
     """Plota a sequência binária ao longo do tempo"""
-    plt.figure(figsize=(12, 4))
+    try:
+        # Criar figura com configurações específicas
+        fig, ax = plt.subplots(figsize=(12, 4))
 
-    tempo = np.arange(len(sequencia))
-    plt.step(tempo, [int(b) for b in sequencia], 
-             where='post', color='#1f77b4', linewidth=1.5)
+        tempo = np.arange(len(sequencia))
+        ax.step(tempo, [int(b) for b in sequencia], 
+                where='post', color='#1f77b4', linewidth=1.5)
 
-    plt.yticks([0, 1], ['0 (Abaixo da média)', '1 (Acima da média)'])
-    plt.xlabel('Tempo (amostras)', fontsize=12)
-    plt.ylabel('Estado Binário', fontsize=12)
-    plt.title(f'Sequência Binária - {nome_base}', fontsize=14)
-    plt.grid(True, alpha=0.3)
-    plt.xlim(0, len(sequencia))
+        ax.set_yticks([0, 1])
+        ax.set_yticklabels(['0 (Abaixo da média)', '1 (Acima da média)'])
+        ax.set_xlabel('Tempo (amostras)', fontsize=12)
+        ax.set_ylabel('Estado Binário', fontsize=12)
+        ax.set_title(f'Sequência Binária - {nome_base}', fontsize=14)
+        ax.grid(True, alpha=0.3)
+        ax.set_xlim(0, len(sequencia))
 
-    nome_arquivo = f"{nome_base}_sequencia.png"
-    caminho = os.path.join("static", nome_arquivo)
-    plt.savefig(caminho, bbox_inches='tight')
-    plt.close('all')  # Fechar todas as figuras
-    plt.clf()  # Limpar figura atual
+        # Salvar figura
+        nome_arquivo = f"{nome_base}_sequencia.png"
+        caminho = os.path.join("static", nome_arquivo)
+        os.makedirs(os.path.dirname(caminho), exist_ok=True)
+        
+        fig.savefig(caminho, dpi=100, bbox_inches='tight', pad_inches=0.1)
+        plt.close(fig)
 
-    return caminho
+        return caminho
+        
+    except Exception as e:
+        print(f"Erro ao plotar sequência para {nome_base}: {e}")
+        # Retornar caminho vazio em caso de erro
+        return ""
 
 def aplicar_dinamica_simbolica(id_sinal, m=3):
     """Função principal que orquestra todo o processo"""
-    conexao = obter_conexao_db()
-    cursor = conexao.cursor()
-
+    conexao = None
+    cursor = None
+    
     try:
+        conexao = obter_conexao_db()
+        cursor = conexao.cursor()
+
         dados_brutos = obter_dados_sinal(cursor, id_sinal)
         verificar_dados(dados_brutos)
         limiar = obter_limiar_sql(cursor, id_sinal)
@@ -148,8 +182,19 @@ def aplicar_dinamica_simbolica(id_sinal, m=3):
         entropia = calcular_entropia_shannon(frequencias)
 
         nome_base = f"sinal_{id_sinal}"
-        caminho_histograma = plotar_histograma(frequencias, nome_base)
-        caminho_sequencia = plotar_sequencia_binaria(sequencia_binaria, nome_base)
+        
+        # Tentar gerar gráficos com tratamento de erro
+        try:
+            caminho_histograma = plotar_histograma(frequencias, nome_base)
+        except Exception as e:
+            print(f"Erro ao gerar histograma para sinal {id_sinal}: {e}")
+            caminho_histograma = ""
+            
+        try:
+            caminho_sequencia = plotar_sequencia_binaria(sequencia_binaria, nome_base)
+        except Exception as e:
+            print(f"Erro ao gerar sequência para sinal {id_sinal}: {e}")
+            caminho_sequencia = ""
 
         return {
             'caminho_histograma': caminho_histograma,
@@ -162,6 +207,12 @@ def aplicar_dinamica_simbolica(id_sinal, m=3):
             'frequencias': frequencias
         }
 
+    except Exception as e:
+        print(f"Erro geral na dinâmica simbólica para sinal {id_sinal}: {e}")
+        return None
+        
     finally:
-        cursor.close()
-        conexao.close()
+        if cursor:
+            cursor.close()
+        if conexao:
+            conexao.close()

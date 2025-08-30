@@ -99,21 +99,36 @@ def gerar_grafico_interativo(limite=10, filtro_categoria=None):
 
     for id_sinal, nome, valores, possui in sinais:
         try:
-            fig = go.Figure(
-                data=[go.Scatter(x=list(range(len(valores))), y=valores, mode="lines")]
-            )
-            fig.update_layout(
-                title=f"Sinal EEG: {nome}",
-                height=400,
-                margin=dict(l=20, r=20, t=40, b=20)
-            )
+            # Verificar se o gráfico já existe no cache
+            cache_file = f"static/graph_cache_{id_sinal}.html"
+            if os.path.exists(cache_file):
+                # Carregar gráfico do cache
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    grafico_html = f.read()
+                print(f"📁 Gráfico carregado do cache: {nome}")
+            else:
+                # Gerar novo gráfico
+                fig = go.Figure(
+                    data=[go.Scatter(x=list(range(len(valores))), y=valores, mode="lines")]
+                )
+                fig.update_layout(
+                    title=f"Sinal EEG: {nome}",
+                    height=400,
+                    margin=dict(l=20, r=20, t=40, b=20)
+                )
 
-            grafico_html = pio.to_html(
-                fig,
-                include_plotlyjs=False,
-                full_html=False,
-                div_id=f'graph_{id_sinal}'
-            )
+                grafico_html = pio.to_html(
+                    fig,
+                    include_plotlyjs=False,
+                    full_html=False,
+                    div_id=f'graph_{id_sinal}'
+                )
+                
+                # Salvar no cache
+                os.makedirs("static", exist_ok=True)
+                with open(cache_file, 'w', encoding='utf-8') as f:
+                    f.write(grafico_html)
+                print(f"💾 Gráfico salvo no cache: {nome}")
 
             htmls.append(f'<div class="graph-container" id="container_{id_sinal}">{grafico_html}</div>')
 

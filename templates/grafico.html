@@ -607,7 +607,7 @@ Visualizer Pro{% endblock %} {% block extra_head %}
         <h4>Predições das IAs:</h4>
         <div class="predictions-grid">
           <!-- Random Forest -->
-          {% if hist.predicao %}
+          {% if hist.predicao and hist.predicao is not string %}
           <div class="prediction-item">
             <div class="prediction-label">Random Forest</div>
             <div
@@ -622,10 +622,17 @@ Visualizer Pro{% endblock %} {% block extra_head %}
               {{ "%.1f"|format(hist.predicao.probabilidade * 100) }}%
             </div>
           </div>
+          {% elif hist.predicao and hist.predicao is string %}
+          <div class="prediction-item">
+            <div class="prediction-label">Random Forest</div>
+            <div class="prediction-placeholder">
+              {{ hist.predicao }}
+            </div>
+          </div>
           {% endif %}
 
           <!-- MLP Tabular -->
-          {% if hist.predicao_cnn %}
+          {% if hist.predicao_cnn and hist.predicao_cnn is not string %}
           <div class="prediction-item">
             <div class="prediction-label">MLP Tabular</div>
             <div
@@ -640,10 +647,17 @@ Visualizer Pro{% endblock %} {% block extra_head %}
               {{ "%.1f"|format(hist.predicao_cnn.probabilidade * 100) }}%
             </div>
           </div>
+          {% elif hist.predicao_cnn and hist.predicao_cnn is string %}
+          <div class="prediction-item">
+            <div class="prediction-label">MLP Tabular</div>
+            <div class="prediction-placeholder">
+              {{ hist.predicao_cnn }}
+            </div>
+          </div>
           {% endif %}
 
           <!-- CNN Original -->
-          {% if hist.predicao_cnn_original %}
+          {% if hist.predicao_cnn_original and hist.predicao_cnn_original is not string %}
           <div class="prediction-item">
             <div class="prediction-label">CNN Original</div>
             <div
@@ -658,10 +672,17 @@ Visualizer Pro{% endblock %} {% block extra_head %}
               {{ "%.1f"|format(hist.predicao_cnn_original.probabilidade * 100) }}%
             </div>
           </div>
+          {% elif hist.predicao_cnn_original and hist.predicao_cnn_original is string %}
+          <div class="prediction-item">
+            <div class="prediction-label">CNN Original</div>
+            <div class="prediction-placeholder">
+              {{ hist.predicao_cnn_original }}
+            </div>
+          </div>
           {% endif %}
 
           <!-- LSTM -->
-          {% if hist.predicao_lstm %}
+          {% if hist.predicao_lstm and hist.predicao_lstm is not string %}
           <div class="prediction-item">
             <div class="prediction-label">LSTM</div>
             <div
@@ -674,6 +695,13 @@ Visualizer Pro{% endblock %} {% block extra_head %}
             </div>
             <div class="prediction-confidence">
               {{ "%.1f"|format(hist.predicao_lstm.probabilidade * 100) }}%
+            </div>
+          </div>
+          {% elif hist.predicao_lstm and hist.predicao_lstm is string %}
+          <div class="prediction-item">
+            <div class="prediction-label">LSTM</div>
+            <div class="prediction-placeholder">
+              {{ hist.predicao_lstm }}
             </div>
           </div>
           {% endif %}

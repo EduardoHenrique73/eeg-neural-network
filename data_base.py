@@ -33,6 +33,20 @@ def criar_banco():
     )
     """)
 
+    # Criação da tabela de predições de IA
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS predicoes_ia (
+        id SERIAL PRIMARY KEY,
+        id_sinal INTEGER NOT NULL,
+        tipo_modelo VARCHAR(50) NOT NULL,
+        classe_predita VARCHAR(10) NOT NULL,
+        probabilidade FLOAT NOT NULL,
+        data_predicao TIMESTAMP DEFAULT NOW(),
+        FOREIGN KEY (id_sinal) REFERENCES sinais(id),
+        UNIQUE(id_sinal, tipo_modelo)
+    )
+    """)
+
     conn.commit()
     conn.close()
 
