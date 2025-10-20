@@ -119,7 +119,7 @@ def gerar_grafico_interativo(limite=10, filtro_categoria=None):
 
                 grafico_html = pio.to_html(
                     fig,
-                    include_plotlyjs=False,
+                    include_plotlyjs=True,
                     full_html=False,
                     div_id=f'graph_{id_sinal}'
                 )

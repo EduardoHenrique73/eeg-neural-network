@@ -543,7 +543,7 @@ def dashboard():
                         'categoria': categoria,
                         'entropia': resultado['entropia'],
                         'complexidade': resultado.get('complexidade', 0.0),
-                        'data_upload': datetime.now().isoformat(),  # Converter para string ISO
+                        'data_upload': datetime.now().strftime('%d/%m/%Y %H:%M'),  # Formatar como string
                         'predicao': predicao
                     })
             except Exception:

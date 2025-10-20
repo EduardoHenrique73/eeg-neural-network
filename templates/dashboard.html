@@ -374,7 +374,7 @@
             <div class="signal-header">
                 <div>
                     <div class="signal-name">{{ sinal.nome_arquivo }}</div>
-                    <div class="signal-date">{{ sinal.data_upload.strftime('%d/%m/%Y %H:%M') }}</div>
+                    <div class="signal-date">{{ sinal.data_upload }}</div>
                 </div>
                 <div class="signal-category {{ 'sim' if sinal.categoria == 'S' else 'nao' }}">
                     <i class="fas {{ 'fa-check' if sinal.categoria == 'S' else 'fa-times' }}"></i>
